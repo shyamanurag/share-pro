@@ -18,22 +18,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       orderBy: { symbol: 'asc' }
     });
 
-    // If no stocks in database, use mock data
+    // If no stocks in database, use Indian NSE stocks
     if (stocks.length === 0) {
-      const mockStocks = [
-        { symbol: "AAPL", name: "Apple Inc.", currentPrice: 182.52, previousClose: 178.72, change: 3.8, changePercent: 2.13, volume: 64829541, marketCap: 2850000000000, sector: "Technology" },
-        { symbol: "MSFT", name: "Microsoft Corporation", currentPrice: 417.88, previousClose: 415.32, change: 2.56, changePercent: 0.62, volume: 22331456, marketCap: 3100000000000, sector: "Technology" },
-        { symbol: "GOOGL", name: "Alphabet Inc.", currentPrice: 172.95, previousClose: 171.48, change: 1.47, changePercent: 0.86, volume: 18234567, marketCap: 2160000000000, sector: "Technology" },
-        { symbol: "AMZN", name: "Amazon.com Inc.", currentPrice: 178.75, previousClose: 180.95, change: -2.2, changePercent: -1.22, volume: 32567890, marketCap: 1850000000000, sector: "Consumer Cyclical" },
-        { symbol: "TSLA", name: "Tesla, Inc.", currentPrice: 172.63, previousClose: 177.29, change: -4.66, changePercent: -2.63, volume: 87654321, marketCap: 548000000000, sector: "Automotive" },
-        { symbol: "META", name: "Meta Platforms, Inc.", currentPrice: 474.36, previousClose: 468.06, change: 6.3, changePercent: 1.35, volume: 15678901, marketCap: 1210000000000, sector: "Technology" },
-        { symbol: "NFLX", name: "Netflix, Inc.", currentPrice: 628.78, previousClose: 622.83, change: 5.95, changePercent: 0.96, volume: 5432109, marketCap: 273000000000, sector: "Entertainment" },
-        { symbol: "NVDA", name: "NVIDIA Corporation", currentPrice: 950.02, previousClose: 938.88, change: 11.14, changePercent: 1.19, volume: 43210987, marketCap: 2340000000000, sector: "Technology" },
+      const indianStocks = [
+        { symbol: "RELIANCE", name: "Reliance Industries Ltd.", currentPrice: 2950.75, previousClose: 2935.20, change: 15.55, changePercent: 0.53, volume: 5432109, marketCap: 19950000000000, sector: "Energy" },
+        { symbol: "TCS", name: "Tata Consultancy Services Ltd.", currentPrice: 3680.45, previousClose: 3650.30, change: 30.15, changePercent: 0.83, volume: 1234567, marketCap: 13450000000000, sector: "IT" },
+        { symbol: "HDFCBANK", name: "HDFC Bank Ltd.", currentPrice: 1675.80, previousClose: 1690.25, change: -14.45, changePercent: -0.85, volume: 3456789, marketCap: 9350000000000, sector: "Banking" },
+        { symbol: "INFY", name: "Infosys Ltd.", currentPrice: 1520.65, previousClose: 1510.40, change: 10.25, changePercent: 0.68, volume: 2345678, marketCap: 6320000000000, sector: "IT" },
+        { symbol: "ICICIBANK", name: "ICICI Bank Ltd.", currentPrice: 1045.30, previousClose: 1050.75, change: -5.45, changePercent: -0.52, volume: 4567890, marketCap: 7290000000000, sector: "Banking" },
+        { symbol: "HINDUNILVR", name: "Hindustan Unilever Ltd.", currentPrice: 2480.55, previousClose: 2465.30, change: 15.25, changePercent: 0.62, volume: 876543, marketCap: 5830000000000, sector: "FMCG" },
+        { symbol: "BAJFINANCE", name: "Bajaj Finance Ltd.", currentPrice: 7250.40, previousClose: 7180.65, change: 69.75, changePercent: 0.97, volume: 654321, marketCap: 4380000000000, sector: "Finance" },
+        { symbol: "BHARTIARTL", name: "Bharti Airtel Ltd.", currentPrice: 1185.25, previousClose: 1175.80, change: 9.45, changePercent: 0.80, volume: 2345678, marketCap: 6620000000000, sector: "Telecom" },
+        { symbol: "SBIN", name: "State Bank of India", currentPrice: 745.60, previousClose: 752.35, change: -6.75, changePercent: -0.90, volume: 5678901, marketCap: 6650000000000, sector: "Banking" },
+        { symbol: "ASIANPAINT", name: "Asian Paints Ltd.", currentPrice: 3120.75, previousClose: 3140.50, change: -19.75, changePercent: -0.63, volume: 432109, marketCap: 2990000000000, sector: "Consumer Durables" },
       ];
 
-      // Insert mock stocks into database
+      // Insert Indian stocks into database
       await prisma.stock.createMany({
-        data: mockStocks.map(stock => ({
+        data: indianStocks.map(stock => ({
           symbol: stock.symbol,
           name: stock.name,
           currentPrice: stock.currentPrice,
