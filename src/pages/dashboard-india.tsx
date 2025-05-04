@@ -646,50 +646,83 @@ export default function Dashboard() {
                       
                       <TabsContent value="futures" className="mt-4">
                         <div className="space-y-4">
-                          {filteredStocks.slice(0, 5).map(stock => (
-                            <motion.div
-                              key={`future-${stock.id}`}
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ duration: 0.3 }}
-                            >
-                              <Card className="overflow-hidden hover:border-blue-500/50 transition-colors">
-                                <CardContent className="p-4">
-                                  <div className="flex justify-between items-start">
-                                    <div>
-                                      <div className="flex items-center space-x-2">
-                                        <h3 className="font-bold">{stock.symbol} FUT</h3>
-                                        <Badge variant="secondary" className="text-xs">
-                                          JUN
-                                        </Badge>
+                          {filteredStocks.slice(0, 5).map(stock => {
+                            const futurePrice = stock.currentPrice * 1.02;
+                            const expiryDate = new Date();
+                            expiryDate.setDate(expiryDate.getDate() + 28);
+                            const lotSize = stock.currentPrice > 1000 ? 25 : 50;
+                            const marginRequired = (futurePrice * lotSize) * 0.15;
+                            const openInterest = Math.floor(stock.volume * 0.1);
+                            
+                            return (
+                              <motion.div
+                                key={`future-${stock.id}`}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.3 }}
+                              >
+                                <Card className="overflow-hidden border-blue-500/20 hover:border-blue-500/70 transition-colors shadow-sm">
+                                  <CardHeader className="p-4 pb-2 bg-gradient-to-r from-blue-500/5 to-indigo-500/5">
+                                    <div className="flex justify-between items-start">
+                                      <div>
+                                        <div className="flex items-center space-x-2">
+                                          <h3 className="font-bold text-blue-700 dark:text-blue-400">{stock.symbol} FUT</h3>
+                                          <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                                            {expiryDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                                          </Badge>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground">{stock.name} Futures</p>
                                       </div>
-                                      <p className="text-sm text-muted-foreground">Lot Size: 50</p>
-                                    </div>
-                                    <div className="text-right">
-                                      <p className="font-bold flex items-center justify-end">
-                                        <IndianRupee className="w-3.5 h-3.5 mr-0.5" />
-                                        {(stock.currentPrice * 1.02).toFixed(2)}
-                                      </p>
-                                      <div className={`flex items-center justify-end text-sm ${stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                        {stock.change >= 0 ? (
-                                          <TrendingUp className="w-3 h-3 mr-1" />
-                                        ) : (
-                                          <TrendingDown className="w-3 h-3 mr-1" />
-                                        )}
-                                        <span>{stock.change >= 0 ? '+' : ''}{(stock.change * 1.1).toFixed(2)} ({stock.change >= 0 ? '+' : ''}{(stock.changePercent * 1.1).toFixed(2)}%)</span>
+                                      <div className="text-right">
+                                        <p className="font-bold flex items-center justify-end text-lg">
+                                          <IndianRupee className="w-4 h-4 mr-0.5" />
+                                          {futurePrice.toFixed(2)}
+                                        </p>
+                                        <div className={`flex items-center justify-end text-sm ${stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                          {stock.change >= 0 ? (
+                                            <TrendingUp className="w-3 h-3 mr-1" />
+                                          ) : (
+                                            <TrendingDown className="w-3 h-3 mr-1" />
+                                          )}
+                                          <span>{stock.change >= 0 ? '+' : ''}{(stock.change * 1.1).toFixed(2)} ({stock.change >= 0 ? '+' : ''}{(stock.changePercent * 1.1).toFixed(2)}%)</span>
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
+                                  </CardHeader>
                                   
-                                  <div className="mt-3 pt-3 border-t border-border">
-                                    <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                                      <div>Open Interest: {(stock.volume * 0.1).toLocaleString()}</div>
-                                      <div>Margin Required: ₹{((stock.currentPrice * 50) * 0.15).toFixed(2)}</div>
+                                  <CardContent className="p-4 pt-2">
+                                    <div className="grid grid-cols-2 gap-4 mt-2">
+                                      <div className="bg-blue-50 dark:bg-blue-950/30 p-2 rounded-md">
+                                        <p className="text-xs text-muted-foreground">Lot Size</p>
+                                        <p className="font-semibold">{lotSize} shares</p>
+                                      </div>
+                                      <div className="bg-blue-50 dark:bg-blue-950/30 p-2 rounded-md">
+                                        <p className="text-xs text-muted-foreground">Contract Value</p>
+                                        <p className="font-semibold flex items-center">
+                                          <IndianRupee className="w-3 h-3 mr-0.5" />
+                                          {(futurePrice * lotSize).toLocaleString('en-IN')}
+                                        </p>
+                                      </div>
                                     </div>
-                                    <div className="mt-3 flex justify-between">
+                                    
+                                    <div className="grid grid-cols-2 gap-4 mt-2">
+                                      <div className="bg-blue-50 dark:bg-blue-950/30 p-2 rounded-md">
+                                        <p className="text-xs text-muted-foreground">Margin Required</p>
+                                        <p className="font-semibold flex items-center">
+                                          <IndianRupee className="w-3 h-3 mr-0.5" />
+                                          {marginRequired.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                        </p>
+                                      </div>
+                                      <div className="bg-blue-50 dark:bg-blue-950/30 p-2 rounded-md">
+                                        <p className="text-xs text-muted-foreground">Open Interest</p>
+                                        <p className="font-semibold">{openInterest.toLocaleString('en-IN')}</p>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="mt-4 flex justify-between">
                                       <Button 
                                         size="sm"
-                                        className="w-[48%] bg-blue-500 hover:bg-blue-600 text-white"
+                                        className="w-[48%] bg-blue-600 hover:bg-blue-700 text-white"
                                         onClick={() => toast({
                                           title: "Coming Soon",
                                           description: "Futures trading will be available soon!",
@@ -699,7 +732,7 @@ export default function Dashboard() {
                                       </Button>
                                       <Button 
                                         size="sm"
-                                        className="w-[48%] bg-purple-500 hover:bg-purple-600 text-white"
+                                        className="w-[48%] bg-indigo-600 hover:bg-indigo-700 text-white"
                                         onClick={() => toast({
                                           title: "Coming Soon",
                                           description: "Futures trading will be available soon!",
@@ -708,60 +741,118 @@ export default function Dashboard() {
                                         <ArrowUpRight className="w-3 h-3 mr-1" /> Sell
                                       </Button>
                                     </div>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            </motion.div>
-                          ))}
+                                  </CardContent>
+                                </Card>
+                              </motion.div>
+                            );
+                          })}
                         </div>
                       </TabsContent>
                       
                       <TabsContent value="options" className="mt-4">
+                        <div className="mb-4 flex justify-between items-center">
+                          <div className="flex space-x-2">
+                            <Button variant="outline" size="sm" className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800 dark:hover:bg-purple-900/40">
+                              Call Options
+                            </Button>
+                            <Button variant="outline" size="sm" className="bg-transparent text-muted-foreground">
+                              Put Options
+                            </Button>
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Expiry: June 27, 2024
+                          </div>
+                        </div>
+                        
                         <div className="space-y-4">
-                          {filteredStocks.slice(0, 5).map(stock => (
-                            <motion.div
-                              key={`option-${stock.id}`}
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ duration: 0.3 }}
-                            >
-                              <Card className="overflow-hidden hover:border-purple-500/50 transition-colors">
-                                <CardContent className="p-4">
-                                  <div className="flex justify-between items-start">
-                                    <div>
-                                      <div className="flex items-center space-x-2">
-                                        <h3 className="font-bold">{stock.symbol} {Math.round(stock.currentPrice / 100) * 100} CE</h3>
-                                        <Badge variant="secondary" className="text-xs">
-                                          JUN
-                                        </Badge>
+                          {filteredStocks.slice(0, 5).map(stock => {
+                            const strikePrice = Math.round(stock.currentPrice / 100) * 100;
+                            const premiumPrice = stock.currentPrice * 0.05;
+                            const lotSize = stock.currentPrice > 1000 ? 25 : 50;
+                            const iv = 15 + Math.random() * 10;
+                            const delta = 0.5 + Math.random() * 0.3;
+                            const theta = -(Math.random() * 2).toFixed(2);
+                            
+                            return (
+                              <motion.div
+                                key={`option-${stock.id}`}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.3 }}
+                              >
+                                <Card className="overflow-hidden border-purple-500/20 hover:border-purple-500/70 transition-colors shadow-sm">
+                                  <CardHeader className="p-4 pb-2 bg-gradient-to-r from-purple-500/5 to-pink-500/5">
+                                    <div className="flex justify-between items-start">
+                                      <div>
+                                        <div className="flex items-center space-x-2">
+                                          <h3 className="font-bold text-purple-700 dark:text-purple-400">{stock.symbol} {strikePrice} CE</h3>
+                                          <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
+                                            27 JUN
+                                          </Badge>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground">Call Option • Lot: {lotSize}</p>
                                       </div>
-                                      <p className="text-sm text-muted-foreground">Strike: ₹{Math.round(stock.currentPrice / 100) * 100}</p>
-                                    </div>
-                                    <div className="text-right">
-                                      <p className="font-bold flex items-center justify-end">
-                                        <IndianRupee className="w-3.5 h-3.5 mr-0.5" />
-                                        {(stock.currentPrice * 0.05).toFixed(2)}
-                                      </p>
-                                      <div className={`flex items-center justify-end text-sm ${stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                        {stock.change >= 0 ? (
-                                          <TrendingUp className="w-3 h-3 mr-1" />
-                                        ) : (
-                                          <TrendingDown className="w-3 h-3 mr-1" />
-                                        )}
-                                        <span>{stock.change >= 0 ? '+' : ''}{(stock.change * 0.2).toFixed(2)} ({stock.change >= 0 ? '+' : ''}{(stock.changePercent * 2).toFixed(2)}%)</span>
+                                      <div className="text-right">
+                                        <p className="font-bold flex items-center justify-end text-lg">
+                                          <IndianRupee className="w-4 h-4 mr-0.5" />
+                                          {premiumPrice.toFixed(2)}
+                                        </p>
+                                        <div className={`flex items-center justify-end text-sm ${stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                          {stock.change >= 0 ? (
+                                            <TrendingUp className="w-3 h-3 mr-1" />
+                                          ) : (
+                                            <TrendingDown className="w-3 h-3 mr-1" />
+                                          )}
+                                          <span>{stock.change >= 0 ? '+' : ''}{(stock.change * 0.2).toFixed(2)} ({stock.change >= 0 ? '+' : ''}{(stock.changePercent * 2).toFixed(2)}%)</span>
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
+                                  </CardHeader>
                                   
-                                  <div className="mt-3 pt-3 border-t border-border">
-                                    <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                                      <div>IV: {(15 + Math.random() * 10).toFixed(2)}%</div>
-                                      <div>Lot Size: 50</div>
+                                  <CardContent className="p-4 pt-2">
+                                    <div className="grid grid-cols-3 gap-2 mt-2">
+                                      <div className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded-md">
+                                        <p className="text-xs text-muted-foreground">Strike</p>
+                                        <p className="font-semibold flex items-center">
+                                          <IndianRupee className="w-3 h-3 mr-0.5" />
+                                          {strikePrice}
+                                        </p>
+                                      </div>
+                                      <div className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded-md">
+                                        <p className="text-xs text-muted-foreground">Spot</p>
+                                        <p className="font-semibold flex items-center">
+                                          <IndianRupee className="w-3 h-3 mr-0.5" />
+                                          {stock.currentPrice.toFixed(2)}
+                                        </p>
+                                      </div>
+                                      <div className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded-md">
+                                        <p className="text-xs text-muted-foreground">IV</p>
+                                        <p className="font-semibold">{iv.toFixed(2)}%</p>
+                                      </div>
                                     </div>
-                                    <div className="mt-3 flex justify-between">
+                                    
+                                    <div className="grid grid-cols-3 gap-2 mt-2">
+                                      <div className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded-md">
+                                        <p className="text-xs text-muted-foreground">Delta</p>
+                                        <p className="font-semibold">{delta.toFixed(2)}</p>
+                                      </div>
+                                      <div className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded-md">
+                                        <p className="text-xs text-muted-foreground">Theta</p>
+                                        <p className="font-semibold">{theta}</p>
+                                      </div>
+                                      <div className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded-md">
+                                        <p className="text-xs text-muted-foreground">Total Value</p>
+                                        <p className="font-semibold flex items-center">
+                                          <IndianRupee className="w-3 h-3 mr-0.5" />
+                                          {(premiumPrice * lotSize).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="mt-4 flex justify-between">
                                       <Button 
                                         size="sm"
-                                        className="w-[48%] bg-blue-500 hover:bg-blue-600 text-white"
+                                        className="w-[48%] bg-purple-600 hover:bg-purple-700 text-white"
                                         onClick={() => toast({
                                           title: "Coming Soon",
                                           description: "Options trading will be available soon!",
@@ -771,7 +862,7 @@ export default function Dashboard() {
                                       </Button>
                                       <Button 
                                         size="sm"
-                                        className="w-[48%] bg-purple-500 hover:bg-purple-600 text-white"
+                                        className="w-[48%] bg-pink-600 hover:bg-pink-700 text-white"
                                         onClick={() => toast({
                                           title: "Coming Soon",
                                           description: "Options trading will be available soon!",
@@ -780,11 +871,11 @@ export default function Dashboard() {
                                         <ArrowUpRight className="w-3 h-3 mr-1" /> Sell
                                       </Button>
                                     </div>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            </motion.div>
-                          ))}
+                                  </CardContent>
+                                </Card>
+                              </motion.div>
+                            );
+                          })}
                         </div>
                       </TabsContent>
                     </Tabs>
@@ -1221,39 +1312,39 @@ export default function Dashboard() {
         </main>
         
         {/* Bottom Navigation */}
-        <nav className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-orange-500/20 to-green-500/20 border-t border-border">
+        <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border shadow-lg">
           <div className="grid grid-cols-4 h-16">
             <Button 
               variant={activeSection === "home" ? "default" : "ghost"} 
-              className={`flex flex-col items-center justify-center rounded-none h-full ${activeSection === "home" ? "bg-green-500 text-white" : "text-foreground hover:bg-green-500/10"}`}
+              className={`flex flex-col items-center justify-center rounded-none h-full ${activeSection === "home" ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white" : "text-foreground hover:bg-green-500/5"}`}
               onClick={() => setActiveSection("home")}
             >
-              <Home className="h-5 w-5" />
-              <span className="text-xs mt-1">Home</span>
+              <Home className={`h-5 w-5 ${activeSection === "home" ? "" : "text-muted-foreground"}`} />
+              <span className={`text-xs mt-1 ${activeSection === "home" ? "" : "text-muted-foreground"}`}>Home</span>
             </Button>
             <Button 
               variant={activeSection === "portfolio" ? "default" : "ghost"} 
-              className={`flex flex-col items-center justify-center rounded-none h-full ${activeSection === "portfolio" ? "bg-green-500 text-white" : "text-foreground hover:bg-green-500/10"}`}
+              className={`flex flex-col items-center justify-center rounded-none h-full ${activeSection === "portfolio" ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white" : "text-foreground hover:bg-green-500/5"}`}
               onClick={() => setActiveSection("portfolio")}
             >
-              <Briefcase className="h-5 w-5" />
-              <span className="text-xs mt-1">Portfolio</span>
+              <Briefcase className={`h-5 w-5 ${activeSection === "portfolio" ? "" : "text-muted-foreground"}`} />
+              <span className={`text-xs mt-1 ${activeSection === "portfolio" ? "" : "text-muted-foreground"}`}>Portfolio</span>
             </Button>
             <Button 
               variant={activeSection === "transactions" ? "default" : "ghost"} 
-              className={`flex flex-col items-center justify-center rounded-none h-full ${activeSection === "transactions" ? "bg-green-500 text-white" : "text-foreground hover:bg-green-500/10"}`}
+              className={`flex flex-col items-center justify-center rounded-none h-full ${activeSection === "transactions" ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white" : "text-foreground hover:bg-green-500/5"}`}
               onClick={() => setActiveSection("transactions")}
             >
-              <Clock className="h-5 w-5" />
-              <span className="text-xs mt-1">History</span>
+              <Clock className={`h-5 w-5 ${activeSection === "transactions" ? "" : "text-muted-foreground"}`} />
+              <span className={`text-xs mt-1 ${activeSection === "transactions" ? "" : "text-muted-foreground"}`}>History</span>
             </Button>
             <Button 
               variant={activeSection === "profile" ? "default" : "ghost"} 
-              className={`flex flex-col items-center justify-center rounded-none h-full ${activeSection === "profile" ? "bg-green-500 text-white" : "text-foreground hover:bg-green-500/10"}`}
+              className={`flex flex-col items-center justify-center rounded-none h-full ${activeSection === "profile" ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white" : "text-foreground hover:bg-green-500/5"}`}
               onClick={() => setActiveSection("profile")}
             >
-              <User className="h-5 w-5" />
-              <span className="text-xs mt-1">Profile</span>
+              <User className={`h-5 w-5 ${activeSection === "profile" ? "" : "text-muted-foreground"}`} />
+              <span className={`text-xs mt-1 ${activeSection === "profile" ? "" : "text-muted-foreground"}`}>Profile</span>
             </Button>
           </div>
         </nav>
