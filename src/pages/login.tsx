@@ -88,6 +88,40 @@ const LoginPage = () => {
               >
                 Continue with Magic Link
               </Button>
+              <Button
+                onClick={async (e) => {
+                  e.preventDefault();
+                  setIsLoading(true);
+                  
+                  try {
+                    // Ensure demo user exists
+                    await fetch('/api/demo/create-demo-user', {
+                      method: 'POST',
+                    });
+                    
+                    // Set demo credentials
+                    formik.setFieldValue('email', 'demo@papertrader.app');
+                    formik.setFieldValue('password', 'demo1234');
+                    
+                    // Submit form after a short delay to allow field values to update
+                    setTimeout(() => {
+                      handleLogin(e);
+                    }, 100);
+                  } catch (error) {
+                    console.error('Error setting up demo account:', error);
+                    toast({
+                      variant: "destructive",
+                      title: "Demo login failed",
+                      description: "Unable to set up demo account. Please try again.",
+                    });
+                    setIsLoading(false);
+                  }
+                }}
+                variant="secondary"
+                className="bg-amber-500 hover:bg-amber-600 text-white"
+              >
+                Try Demo Account
+              </Button>
             </div>
             <form onSubmit={handleLogin}>
               <div className="flex flex-col gap-6">
