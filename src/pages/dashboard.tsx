@@ -414,7 +414,7 @@ export default function Dashboard() {
                   <div className="flex justify-between items-center">
                     <div>
                       <p className="text-sm text-muted-foreground">Available Balance</p>
-                      <h2 className="text-2xl font-bold">${userProfile?.balance.toFixed(2) || "0.00"}</h2>
+                      <h2 className="text-2xl font-bold">${userProfile?.balance?.toFixed(2) || "0.00"}</h2>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Portfolio Value</p>
@@ -424,7 +424,7 @@ export default function Dashboard() {
                   <div className="mt-4 pt-4 border-t border-border">
                     <div className="flex justify-between items-center">
                       <p className="text-sm font-medium">Total Value</p>
-                      <p className="text-lg font-bold">${(userProfile?.balance + portfolioValue).toFixed(2) || "0.00"}</p>
+                      <p className="text-lg font-bold">${((userProfile?.balance || 0) + portfolioValue).toFixed(2)}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -713,7 +713,7 @@ export default function Dashboard() {
                   <div className="flex justify-between items-center">
                     <div>
                       <p className="text-sm text-muted-foreground">Available Balance</p>
-                      <h2 className="text-2xl font-bold">${userProfile?.balance.toFixed(2) || "0.00"}</h2>
+                      <h2 className="text-2xl font-bold">${userProfile?.balance?.toFixed(2) || "0.00"}</h2>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Portfolio Value</p>
@@ -723,7 +723,7 @@ export default function Dashboard() {
                   <div className="mt-4 pt-4 border-t border-border">
                     <div className="flex justify-between items-center">
                       <p className="text-sm font-medium">Total Value</p>
-                      <p className="text-lg font-bold">${(userProfile?.balance + portfolioValue).toFixed(2) || "0.00"}</p>
+                      <p className="text-lg font-bold">${((userProfile?.balance || 0) +  portfolioValue).toFixed(2)}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -933,7 +933,7 @@ export default function Dashboard() {
                     <Card>
                       <CardContent className="p-4 text-center">
                         <p className="text-sm text-muted-foreground">Balance</p>
-                        <p className="text-xl font-bold">${userProfile?.balance.toFixed(2) || "0.00"}</p>
+                        <p className="text-xl font-bold">${userProfile?.balance?.toFixed(2) || "0.00"}</p>
                       </CardContent>
                     </Card>
                     <Card>
@@ -947,7 +947,7 @@ export default function Dashboard() {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <p className="text-sm font-medium">Total Value</p>
-                      <p className="text-lg font-bold">${(userProfile?.balance + portfolioValue).toFixed(2) || "0.00"}</p>
+                      <p className="text-lg font-bold">${((userProfile?.balance || 0) + portfolioValue).toFixed(2)}</p>
                     </div>
                     <div className="flex justify-between items-center">
                       <p className="text-sm font-medium">Transactions</p>
@@ -1025,7 +1025,7 @@ export default function Dashboard() {
             <div className="space-y-4 py-4">
               <div className="flex justify-between items-center">
                 <p className="text-sm font-medium">Available Balance:</p>
-                <p className="text-sm font-bold">${userProfile?.balance.toFixed(2) || "0.00"}</p>
+                <p className="text-sm font-bold">${userProfile?.balance?.toFixed(2) || "0.00"}</p>
               </div>
               
               {tradeType === 'SELL' && (
