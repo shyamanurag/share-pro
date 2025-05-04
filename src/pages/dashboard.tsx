@@ -4,11 +4,13 @@ import { useRouter } from "next/router";
 import { motion } from "framer-motion";
 import Head from "next/head";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { toast } from "@/components/ui/use-toast";
 import { 
   Search, 
   Bell, 
@@ -21,45 +23,172 @@ import {
   TrendingDown,
   Star,
   StarOff,
-  RefreshCw
+  RefreshCw,
+  DollarSign,
+  Clock,
+  ShoppingCart,
+  ArrowUpRight,
+  ArrowDownRight,
+  User
 } from "lucide-react";
 import prisma from "@/lib/prisma";
 
-// Mock data for stocks
-const mockStocks = [
-  { id: "1", symbol: "AAPL", name: "Apple Inc.", currentPrice: 182.52, previousClose: 178.72, change: 3.8, changePercent: 2.13, volume: 64829541, marketCap: 2850000000000, sector: "Technology" },
-  { id: "2", symbol: "MSFT", name: "Microsoft Corporation", currentPrice: 417.88, previousClose: 415.32, change: 2.56, changePercent: 0.62, volume: 22331456, marketCap: 3100000000000, sector: "Technology" },
-  { id: "3", symbol: "GOOGL", name: "Alphabet Inc.", currentPrice: 172.95, previousClose: 171.48, change: 1.47, changePercent: 0.86, volume: 18234567, marketCap: 2160000000000, sector: "Technology" },
-  { id: "4", symbol: "AMZN", name: "Amazon.com Inc.", currentPrice: 178.75, previousClose: 180.95, change: -2.2, changePercent: -1.22, volume: 32567890, marketCap: 1850000000000, sector: "Consumer Cyclical" },
-  { id: "5", symbol: "TSLA", name: "Tesla, Inc.", currentPrice: 172.63, previousClose: 177.29, change: -4.66, changePercent: -2.63, volume: 87654321, marketCap: 548000000000, sector: "Automotive" },
-  { id: "6", symbol: "META", name: "Meta Platforms, Inc.", currentPrice: 474.36, previousClose: 468.06, change: 6.3, changePercent: 1.35, volume: 15678901, marketCap: 1210000000000, sector: "Technology" },
-  { id: "7", symbol: "NFLX", name: "Netflix, Inc.", currentPrice: 628.78, previousClose: 622.83, change: 5.95, changePercent: 0.96, volume: 5432109, marketCap: 273000000000, sector: "Entertainment" },
-  { id: "8", symbol: "NVDA", name: "NVIDIA Corporation", currentPrice: 950.02, previousClose: 938.88, change: 11.14, changePercent: 1.19, volume: 43210987, marketCap: 2340000000000, sector: "Technology" },
-];
-
-// Mock data for market indices
+// Market indices data
 const marketIndices = [
   { name: "S&P 500", value: "5,232.93", change: "+0.58%" },
   { name: "NASDAQ", value: "16,429.51", change: "+0.81%" },
   { name: "DOW", value: "38,686.32", change: "+0.35%" },
 ];
 
+// Types
+interface Stock {
+  id: string;
+  symbol: string;
+  name: string;
+  currentPrice: number;
+  previousClose: number;
+  change: number;
+  changePercent: number;
+  volume: number;
+  marketCap: number | null;
+  sector: string | null;
+}
+
+interface WatchlistItem {
+  id: string;
+  watchlistId: string;
+  stockId: string;
+  addedAt: string;
+  stock: Stock;
+}
+
+interface PortfolioItem {
+  id: string;
+  portfolioId: string;
+  stockId: string;
+  quantity: number;
+  avgBuyPrice: number;
+  stock: Stock;
+}
+
+interface Transaction {
+  id: string;
+  userId: string;
+  stockId: string;
+  type: string;
+  quantity: number;
+  price: number;
+  total: number;
+  timestamp: string;
+  stock: Stock;
+}
+
+interface UserProfile {
+  id: string;
+  email: string;
+  name: string | null;
+  avatarUrl: string | null;
+  balance: number;
+  createdAt: string;
+}
+
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [stocks, setStocks] = useState(mockStocks);
-  const [watchlist, setWatchlist] = useState<string[]>([]);
+  const [stocks, setStocks] = useState<Stock[]>([]);
+  const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>([]);
+  const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [portfolioValue, setPortfolioValue] = useState(0);
   const [activeTab, setActiveTab] = useState("market");
+  const [activeSection, setActiveSection] = useState("home");
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
+  const [tradeQuantity, setTradeQuantity] = useState(1);
+  const [tradeType, setTradeType] = useState<'BUY' | 'SELL'>('BUY');
+  const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
 
-  // Simulate loading stocks
-  useEffect(() => {
-    setIsLoading(true);
-    setTimeout(() => {
+  // Fetch stocks
+  const fetchStocks = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/stocks');
+      if (!response.ok) throw new Error('Failed to fetch stocks');
+      const data = await response.json();
+      setStocks(data.stocks);
+    } catch (error) {
+      console.error('Error fetching stocks:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to fetch stocks",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1000);
-  }, []);
+    }
+  };
+
+  // Fetch watchlist
+  const fetchWatchlist = async () => {
+    try {
+      const response = await fetch('/api/watchlist');
+      if (!response.ok) throw new Error('Failed to fetch watchlist');
+      const data = await response.json();
+      setWatchlistItems(data.items);
+    } catch (error) {
+      console.error('Error fetching watchlist:', error);
+    }
+  };
+
+  // Fetch portfolio
+  const fetchPortfolio = async () => {
+    try {
+      const response = await fetch('/api/portfolio');
+      if (!response.ok) throw new Error('Failed to fetch portfolio');
+      const data = await response.json();
+      setPortfolioItems(data.items);
+      setPortfolioValue(data.portfolioValue);
+    } catch (error) {
+      console.error('Error fetching portfolio:', error);
+    }
+  };
+
+  // Fetch transactions
+  const fetchTransactions = async () => {
+    try {
+      const response = await fetch('/api/transactions');
+      if (!response.ok) throw new Error('Failed to fetch transactions');
+      const data = await response.json();
+      setTransactions(data.transactions);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+    }
+  };
+
+  // Fetch user profile
+  const fetchUserProfile = async () => {
+    try {
+      const response = await fetch('/api/user/profile');
+      if (!response.ok) throw new Error('Failed to fetch user profile');
+      const data = await response.json();
+      setUserProfile(data.user);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
+
+  // Load initial data
+  useEffect(() => {
+    if (user) {
+      fetchStocks();
+      fetchWatchlist();
+      fetchPortfolio();
+      fetchTransactions();
+      fetchUserProfile();
+    }
+  }, [user]);
 
   // Filter stocks based on search query
   const filteredStocks = stocks.filter(stock => 
@@ -67,40 +196,146 @@ export default function Dashboard() {
     stock.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Filter watchlist stocks
-  const watchlistStocks = stocks.filter(stock => watchlist.includes(stock.id));
+  // Get watchlist stock IDs
+  const watchlistStockIds = watchlistItems.map(item => item.stockId);
 
   // Toggle watchlist
-  const toggleWatchlist = (stockId: string) => {
-    if (watchlist.includes(stockId)) {
-      setWatchlist(watchlist.filter(id => id !== stockId));
-    } else {
-      setWatchlist([...watchlist, stockId]);
+  const toggleWatchlist = async (stockId: string) => {
+    try {
+      if (watchlistStockIds.includes(stockId)) {
+        // Remove from watchlist
+        const response = await fetch(`/api/watchlist/${stockId}`, {
+          method: 'DELETE',
+        });
+        
+        if (!response.ok) throw new Error('Failed to remove from watchlist');
+        
+        setWatchlistItems(watchlistItems.filter(item => item.stockId !== stockId));
+        toast({
+          title: "Removed from watchlist",
+          description: "Stock removed from your watchlist",
+        });
+      } else {
+        // Add to watchlist
+        const response = await fetch('/api/watchlist', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ stockId }),
+        });
+        
+        if (!response.ok) throw new Error('Failed to add to watchlist');
+        
+        const data = await response.json();
+        setWatchlistItems([...watchlistItems, data.watchlistItem]);
+        toast({
+          title: "Added to watchlist",
+          description: "Stock added to your watchlist",
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling watchlist:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update watchlist",
+      });
     }
   };
 
   // Refresh stock data
-  const refreshStocks = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      // Simulate updating stock prices with small random changes
-      const updatedStocks = stocks.map(stock => {
-        const randomChange = (Math.random() * 2 - 1) * (stock.currentPrice * 0.01);
-        const newPrice = stock.currentPrice + randomChange;
-        const newChange = newPrice - stock.previousClose;
-        const newChangePercent = (newChange / stock.previousClose) * 100;
-        
-        return {
-          ...stock,
-          currentPrice: parseFloat(newPrice.toFixed(2)),
-          change: parseFloat(newChange.toFixed(2)),
-          changePercent: parseFloat(newChangePercent.toFixed(2))
-        };
+  const refreshStocks = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/stocks/refresh', {
+        method: 'POST',
       });
       
-      setStocks(updatedStocks);
+      if (!response.ok) throw new Error('Failed to refresh stocks');
+      
+      const data = await response.json();
+      setStocks(data.stocks);
+      
+      // Refresh portfolio and watchlist to get updated values
+      fetchPortfolio();
+      fetchWatchlist();
+      
+      toast({
+        title: "Stocks refreshed",
+        description: "Latest stock prices loaded",
+      });
+    } catch (error) {
+      console.error('Error refreshing stocks:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to refresh stocks",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
+  };
+
+  // Open trade dialog
+  const openTradeDialog = (stock: Stock, type: 'BUY' | 'SELL' = 'BUY') => {
+    setSelectedStock(stock);
+    setTradeType(type);
+    setTradeQuantity(1);
+    setIsTradeDialogOpen(true);
+  };
+
+  // Execute trade
+  const executeTrade = async () => {
+    if (!selectedStock) return;
+    
+    try {
+      const response = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          stockId: selectedStock.id,
+          type: tradeType,
+          quantity: tradeQuantity,
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to execute trade');
+      }
+      
+      const data = await response.json();
+      
+      // Update transactions list
+      setTransactions([data.transaction, ...transactions]);
+      
+      // Refresh portfolio and user profile
+      fetchPortfolio();
+      fetchUserProfile();
+      
+      setIsTradeDialogOpen(false);
+      
+      toast({
+        title: `${tradeType === 'BUY' ? 'Purchase' : 'Sale'} Successful`,
+        description: `${tradeType === 'BUY' ? 'Bought' : 'Sold'} ${tradeQuantity} shares of ${selectedStock.symbol} at $${selectedStock.currentPrice.toFixed(2)}`,
+      });
+    } catch (error: any) {
+      console.error('Error executing trade:', error);
+      toast({
+        variant: "destructive",
+        title: "Trade Failed",
+        description: error.message || "Failed to execute trade",
+      });
+    }
+  };
+
+  // Calculate total trade value
+  const calculateTradeValue = () => {
+    if (!selectedStock) return 0;
+    return selectedStock.currentPrice * tradeQuantity;
   };
 
   if (!user) {
@@ -171,127 +406,295 @@ export default function Dashboard() {
         </header>
         
         <main className="flex-1 p-4 pb-20">
-          {/* Search Bar */}
-          <div className="relative mb-6">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-            <Input
-              type="text"
-              placeholder="Search stocks..."
-              className="pl-10 pr-4 py-2 w-full"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          
-          {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="market">Market</TabsTrigger>
-              <TabsTrigger value="watchlist">Watchlist</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="market" className="mt-4">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">Market Overview</h2>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={refreshStocks}
-                  disabled={isLoading}
-                  className="flex items-center gap-1"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
-              </div>
-              
-              <div className="space-y-4">
-                {isLoading ? (
-                  // Loading skeleton
-                  Array(5).fill(0).map((_, i) => (
-                    <Card key={i} className="animate-pulse">
-                      <CardContent className="p-4">
-                        <div className="flex justify-between">
-                          <div className="space-y-2">
-                            <div className="h-5 w-16 bg-muted rounded"></div>
-                            <div className="h-4 w-32 bg-muted rounded"></div>
-                          </div>
-                          <div className="space-y-2">
-                            <div className="h-5 w-20 bg-muted rounded"></div>
-                            <div className="h-4 w-16 bg-muted rounded"></div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                ) : (
-                  filteredStocks.map(stock => (
-                    <motion.div
-                      key={stock.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <Card className="overflow-hidden hover:border-green-500/50 transition-colors">
-                        <CardContent className="p-4">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <div className="flex items-center space-x-2">
-                                <h3 className="font-bold">{stock.symbol}</h3>
-                                <Badge variant="outline" className="text-xs">
-                                  {stock.sector}
-                                </Badge>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-8 w-8"
-                                  onClick={() => toggleWatchlist(stock.id)}
-                                >
-                                  {watchlist.includes(stock.id) ? (
-                                    <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                                  ) : (
-                                    <Star className="h-4 w-4 text-muted-foreground" />
-                                  )}
-                                </Button>
-                              </div>
-                              <p className="text-sm text-muted-foreground">{stock.name}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="font-bold">${stock.currentPrice.toFixed(2)}</p>
-                              <div className={`flex items-center justify-end text-sm ${stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                {stock.change >= 0 ? (
-                                  <TrendingUp className="w-3 h-3 mr-1" />
-                                ) : (
-                                  <TrendingDown className="w-3 h-3 mr-1" />
-                                )}
-                                <span>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)} ({stock.change >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%)</span>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div className="mt-3 pt-3 border-t border-border">
-                            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                              <div>Volume: {stock.volume.toLocaleString()}</div>
-                              <div>Market Cap: ${(stock.marketCap / 1000000000).toFixed(2)}B</div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))
-                )}
-                
-                {!isLoading && filteredStocks.length === 0 && (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">No stocks found matching "{searchQuery}"</p>
+          {activeSection === "home" && (
+            <>
+              {/* User Balance Card */}
+              <Card className="mb-6 bg-gradient-to-r from-green-500/10 to-blue-500/10">
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Available Balance</p>
+                      <h2 className="text-2xl font-bold">${userProfile?.balance.toFixed(2) || "0.00"}</h2>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground">Portfolio Value</p>
+                      <h2 className="text-2xl font-bold">${portfolioValue.toFixed(2)}</h2>
+                    </div>
                   </div>
-                )}
-              </div>
-            </TabsContent>
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <div className="flex justify-between items-center">
+                      <p className="text-sm font-medium">Total Value</p>
+                      <p className="text-lg font-bold">${(userProfile?.balance + portfolioValue).toFixed(2) || "0.00"}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             
-            <TabsContent value="watchlist" className="mt-4">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">My Watchlist</h2>
+              {/* Search Bar */}
+              <div className="relative mb-6">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  type="text"
+                  placeholder="Search stocks..."
+                  className="pl-10 pr-4 py-2 w-full"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              
+              {/* Tabs */}
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="market">Market</TabsTrigger>
+                  <TabsTrigger value="watchlist">Watchlist</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="market" className="mt-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">Market Overview</h2>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={refreshStocks}
+                      disabled={isLoading}
+                      className="flex items-center gap-1"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                      Refresh
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {isLoading ? (
+                      // Loading skeleton
+                      Array(5).fill(0).map((_, i) => (
+                        <Card key={i} className="animate-pulse">
+                          <CardContent className="p-4">
+                            <div className="flex justify-between">
+                              <div className="space-y-2">
+                                <div className="h-5 w-16 bg-muted rounded"></div>
+                                <div className="h-4 w-32 bg-muted rounded"></div>
+                              </div>
+                              <div className="space-y-2">
+                                <div className="h-5 w-20 bg-muted rounded"></div>
+                                <div className="h-4 w-16 bg-muted rounded"></div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    ) : (
+                      filteredStocks.map(stock => (
+                        <motion.div
+                          key={stock.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3 }}
+                        >
+                          <Card className="overflow-hidden hover:border-green-500/50 transition-colors">
+                            <CardContent className="p-4">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <div className="flex items-center space-x-2">
+                                    <h3 className="font-bold">{stock.symbol}</h3>
+                                    <Badge variant="outline" className="text-xs">
+                                      {stock.sector}
+                                    </Badge>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-8 w-8"
+                                      onClick={() => toggleWatchlist(stock.id)}
+                                    >
+                                      {watchlistStockIds.includes(stock.id) ? (
+                                        <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                                      ) : (
+                                        <Star className="h-4 w-4 text-muted-foreground" />
+                                      )}
+                                    </Button>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground">{stock.name}</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-bold">${stock.currentPrice.toFixed(2)}</p>
+                                  <div className={`flex items-center justify-end text-sm ${stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                    {stock.change >= 0 ? (
+                                      <TrendingUp className="w-3 h-3 mr-1" />
+                                    ) : (
+                                      <TrendingDown className="w-3 h-3 mr-1" />
+                                    )}
+                                    <span>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)} ({stock.change >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%)</span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="mt-3 pt-3 border-t border-border">
+                                <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                  <div>Volume: {stock.volume.toLocaleString()}</div>
+                                  <div>Market Cap: ${(stock.marketCap ? (stock.marketCap / 1000000000).toFixed(2) : "N/A")}B</div>
+                                </div>
+                                <div className="mt-3 flex justify-between">
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="w-[48%]"
+                                    onClick={() => openTradeDialog(stock, 'BUY')}
+                                  >
+                                    <ShoppingCart className="w-3 h-3 mr-1" /> Buy
+                                  </Button>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="w-[48%]"
+                                    onClick={() => openTradeDialog(stock, 'SELL')}
+                                  >
+                                    <ArrowUpRight className="w-3 h-3 mr-1" /> Sell
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      ))
+                    )}
+                    
+                    {!isLoading && filteredStocks.length === 0 && (
+                      <div className="text-center py-8">
+                        <p className="text-muted-foreground">No stocks found matching "{searchQuery}"</p>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="watchlist" className="mt-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">My Watchlist</h2>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={refreshStocks}
+                      disabled={isLoading}
+                      className="flex items-center gap-1"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                      Refresh
+                    </Button>
+                  </div>
+                  
+                  {watchlistItems.length > 0 ? (
+                    <div className="space-y-4">
+                      {isLoading ? (
+                        // Loading skeleton
+                        Array(3).fill(0).map((_, i) => (
+                          <Card key={i} className="animate-pulse">
+                            <CardContent className="p-4">
+                              <div className="flex justify-between">
+                                <div className="space-y-2">
+                                  <div className="h-5 w-16 bg-muted rounded"></div>
+                                  <div className="h-4 w-32 bg-muted rounded"></div>
+                                </div>
+                                <div className="space-y-2">
+                                  <div className="h-5 w-20 bg-muted rounded"></div>
+                                  <div className="h-4 w-16 bg-muted rounded"></div>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))
+                      ) : (
+                        watchlistItems.map(item => (
+                          <motion.div
+                            key={item.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3 }}
+                          >
+                            <Card className="overflow-hidden hover:border-green-500/50 transition-colors">
+                              <CardContent className="p-4">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <div className="flex items-center space-x-2">
+                                      <h3 className="font-bold">{item.stock.symbol}</h3>
+                                      <Badge variant="outline" className="text-xs">
+                                        {item.stock.sector}
+                                      </Badge>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-8 w-8"
+                                        onClick={() => toggleWatchlist(item.stockId)}
+                                      >
+                                        <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                                      </Button>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground">{item.stock.name}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="font-bold">${item.stock.currentPrice.toFixed(2)}</p>
+                                    <div className={`flex items-center justify-end text-sm ${item.stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                      {item.stock.change >= 0 ? (
+                                        <TrendingUp className="w-3 h-3 mr-1" />
+                                      ) : (
+                                        <TrendingDown className="w-3 h-3 mr-1" />
+                                      )}
+                                      <span>{item.stock.change >= 0 ? '+' : ''}{item.stock.change.toFixed(2)} ({item.stock.change >= 0 ? '+' : ''}{item.stock.changePercent.toFixed(2)}%)</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                <div className="mt-3 pt-3 border-t border-border">
+                                  <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                    <div>Volume: {item.stock.volume.toLocaleString()}</div>
+                                    <div>Market Cap: ${(item.stock.marketCap ? (item.stock.marketCap / 1000000000).toFixed(2) : "N/A")}B</div>
+                                  </div>
+                                  <div className="mt-3 flex justify-between">
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      className="w-[48%]"
+                                      onClick={() => openTradeDialog(item.stock, 'BUY')}
+                                    >
+                                      <ShoppingCart className="w-3 h-3 mr-1" /> Buy
+                                    </Button>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      className="w-[48%]"
+                                      onClick={() => openTradeDialog(item.stock, 'SELL')}
+                                    >
+                                      <ArrowUpRight className="w-3 h-3 mr-1" /> Sell
+                                    </Button>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </motion.div>
+                        ))
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 border border-dashed border-muted-foreground/20 rounded-lg">
+                      <Star className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium mb-2">Your watchlist is empty</h3>
+                      <p className="text-muted-foreground mb-4">Add stocks to your watchlist by clicking the star icon</p>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setActiveTab("market")}
+                        className="mx-auto"
+                      >
+                        Browse Market
+                      </Button>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </>
+          )}
+
+          {activeSection === "portfolio" && (
+            <>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold">My Portfolio</h2>
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -303,8 +706,33 @@ export default function Dashboard() {
                   Refresh
                 </Button>
               </div>
+
+              {/* Portfolio Summary */}
+              <Card className="mb-6 bg-gradient-to-r from-green-500/10 to-blue-500/10">
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Available Balance</p>
+                      <h2 className="text-2xl font-bold">${userProfile?.balance.toFixed(2) || "0.00"}</h2>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground">Portfolio Value</p>
+                      <h2 className="text-2xl font-bold">${portfolioValue.toFixed(2)}</h2>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <div className="flex justify-between items-center">
+                      <p className="text-sm font-medium">Total Value</p>
+                      <p className="text-lg font-bold">${(userProfile?.balance + portfolioValue).toFixed(2) || "0.00"}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Portfolio Holdings */}
+              <h3 className="text-lg font-semibold mb-4">Holdings</h3>
               
-              {watchlistStocks.length > 0 ? (
+              {portfolioItems.length > 0 ? (
                 <div className="space-y-4">
                   {isLoading ? (
                     // Loading skeleton
@@ -325,97 +753,353 @@ export default function Dashboard() {
                       </Card>
                     ))
                   ) : (
-                    watchlistStocks.map(stock => (
-                      <motion.div
-                        key={stock.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3 }}
-                      >
-                        <Card className="overflow-hidden hover:border-green-500/50 transition-colors">
-                          <CardContent className="p-4">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <div className="flex items-center space-x-2">
-                                  <h3 className="font-bold">{stock.symbol}</h3>
-                                  <Badge variant="outline" className="text-xs">
-                                    {stock.sector}
-                                  </Badge>
+                    portfolioItems.map(item => {
+                      const currentValue = item.quantity * item.stock.currentPrice;
+                      const costBasis = item.quantity * item.avgBuyPrice;
+                      const profit = currentValue - costBasis;
+                      const profitPercent = (profit / costBasis) * 100;
+                      
+                      return (
+                        <motion.div
+                          key={item.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3 }}
+                        >
+                          <Card className="overflow-hidden hover:border-green-500/50 transition-colors">
+                            <CardContent className="p-4">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <div className="flex items-center space-x-2">
+                                    <h3 className="font-bold">{item.stock.symbol}</h3>
+                                    <Badge variant="outline" className="text-xs">
+                                      {item.quantity} shares
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground">{item.stock.name}</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-bold">${currentValue.toFixed(2)}</p>
+                                  <div className={`flex items-center justify-end text-sm ${profit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                    {profit >= 0 ? (
+                                      <TrendingUp className="w-3 h-3 mr-1" />
+                                    ) : (
+                                      <TrendingDown className="w-3 h-3 mr-1" />
+                                    )}
+                                    <span>{profit >= 0 ? '+' : ''}{profit.toFixed(2)} ({profit >= 0 ? '+' : ''}{profitPercent.toFixed(2)}%)</span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="mt-3 pt-3 border-t border-border">
+                                <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                  <div>Avg. Buy: ${item.avgBuyPrice.toFixed(2)}</div>
+                                  <div>Current: ${item.stock.currentPrice.toFixed(2)}</div>
+                                </div>
+                                <div className="mt-3 flex justify-between">
                                   <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="h-8 w-8"
-                                    onClick={() => toggleWatchlist(stock.id)}
+                                    variant="outline" 
+                                    size="sm"
+                                    className="w-[48%]"
+                                    onClick={() => openTradeDialog(item.stock, 'BUY')}
                                   >
-                                    <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                                    <ShoppingCart className="w-3 h-3 mr-1" /> Buy More
+                                  </Button>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="w-[48%]"
+                                    onClick={() => openTradeDialog(item.stock, 'SELL')}
+                                  >
+                                    <ArrowUpRight className="w-3 h-3 mr-1" /> Sell
                                   </Button>
                                 </div>
-                                <p className="text-sm text-muted-foreground">{stock.name}</p>
                               </div>
-                              <div className="text-right">
-                                <p className="font-bold">${stock.currentPrice.toFixed(2)}</p>
-                                <div className={`flex items-center justify-end text-sm ${stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                  {stock.change >= 0 ? (
-                                    <TrendingUp className="w-3 h-3 mr-1" />
-                                  ) : (
-                                    <TrendingDown className="w-3 h-3 mr-1" />
-                                  )}
-                                  <span>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)} ({stock.change >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%)</span>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="mt-3 pt-3 border-t border-border">
-                              <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                                <div>Volume: {stock.volume.toLocaleString()}</div>
-                                <div>Market Cap: ${(stock.marketCap / 1000000000).toFixed(2)}B</div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    ))
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      );
+                    })
                   )}
                 </div>
               ) : (
                 <div className="text-center py-12 border border-dashed border-muted-foreground/20 rounded-lg">
-                  <Star className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Your watchlist is empty</h3>
-                  <p className="text-muted-foreground mb-4">Add stocks to your watchlist by clicking the star icon</p>
+                  <Briefcase className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">Your portfolio is empty</h3>
+                  <p className="text-muted-foreground mb-4">Start investing by buying stocks from the market</p>
                   <Button 
                     variant="outline" 
-                    onClick={() => setActiveTab("market")}
+                    onClick={() => setActiveSection("home")}
                     className="mx-auto"
                   >
                     Browse Market
                   </Button>
                 </div>
               )}
-            </TabsContent>
-          </Tabs>
+            </>
+          )}
+
+          {activeSection === "transactions" && (
+            <>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold">Transaction History</h2>
+              </div>
+              
+              {transactions.length > 0 ? (
+                <div className="space-y-4">
+                  {transactions.map(transaction => (
+                    <motion.div
+                      key={transaction.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <Card className="overflow-hidden">
+                        <CardContent className="p-4">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="flex items-center space-x-2">
+                                <Badge variant={transaction.type === 'BUY' ? 'default' : 'destructive'} className="text-xs">
+                                  {transaction.type}
+                                </Badge>
+                                <h3 className="font-bold">{transaction.stock.symbol}</h3>
+                                <Badge variant="outline" className="text-xs">
+                                  {transaction.quantity} shares
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground">{transaction.stock.name}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold">${transaction.total.toFixed(2)}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(transaction.timestamp).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-3 pt-3 border-t border-border">
+                            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                              <div>Price: ${transaction.price.toFixed(2)}</div>
+                              <div>Total: ${transaction.total.toFixed(2)}</div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 border border-dashed border-muted-foreground/20 rounded-lg">
+                  <Clock className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No transactions yet</h3>
+                  <p className="text-muted-foreground mb-4">Your transaction history will appear here</p>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setActiveSection("home")}
+                    className="mx-auto"
+                  >
+                    Start Trading
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+
+          {activeSection === "profile" && (
+            <>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold">My Profile</h2>
+              </div>
+              
+              <Card className="mb-6">
+                <CardContent className="p-6">
+                  <div className="flex flex-col items-center mb-6">
+                    <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4">
+                      {userProfile?.avatarUrl ? (
+                        <img 
+                          src={userProfile.avatarUrl} 
+                          alt="Profile" 
+                          className="w-full h-full rounded-full object-cover"
+                        />
+                      ) : (
+                        <User className="w-10 h-10 text-muted-foreground" />
+                      )}
+                    </div>
+                    <h3 className="text-xl font-bold">{userProfile?.name || userProfile?.email}</h3>
+                    <p className="text-sm text-muted-foreground">{userProfile?.email}</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <p className="text-sm text-muted-foreground">Balance</p>
+                        <p className="text-xl font-bold">${userProfile?.balance.toFixed(2) || "0.00"}</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <p className="text-sm text-muted-foreground">Portfolio Value</p>
+                        <p className="text-xl font-bold">${portfolioValue.toFixed(2)}</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <p className="text-sm font-medium">Total Value</p>
+                      <p className="text-lg font-bold">${(userProfile?.balance + portfolioValue).toFixed(2) || "0.00"}</p>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <p className="text-sm font-medium">Transactions</p>
+                      <p className="text-lg font-bold">{transactions.length}</p>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <p className="text-sm font-medium">Joined</p>
+                      <p className="text-sm">{userProfile ? new Date(userProfile.createdAt).toLocaleDateString() : ""}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Button 
+                variant="destructive" 
+                className="w-full"
+                onClick={signOut}
+              >
+                Sign Out
+              </Button>
+            </>
+          )}
         </main>
         
         {/* Bottom Navigation */}
         <nav className="fixed bottom-0 left-0 right-0 bg-background border-t border-border">
           <div className="grid grid-cols-4 h-16">
-            <Button variant="ghost" className="flex flex-col items-center justify-center rounded-none h-full">
+            <Button 
+              variant={activeSection === "home" ? "default" : "ghost"} 
+              className="flex flex-col items-center justify-center rounded-none h-full"
+              onClick={() => setActiveSection("home")}
+            >
               <Home className="h-5 w-5" />
               <span className="text-xs mt-1">Home</span>
             </Button>
-            <Button variant="ghost" className="flex flex-col items-center justify-center rounded-none h-full">
-              <LineChart className="h-5 w-5" />
-              <span className="text-xs mt-1">Markets</span>
-            </Button>
-            <Button variant="ghost" className="flex flex-col items-center justify-center rounded-none h-full">
+            <Button 
+              variant={activeSection === "portfolio" ? "default" : "ghost"} 
+              className="flex flex-col items-center justify-center rounded-none h-full"
+              onClick={() => setActiveSection("portfolio")}
+            >
               <Briefcase className="h-5 w-5" />
               <span className="text-xs mt-1">Portfolio</span>
             </Button>
-            <Button variant="ghost" className="flex flex-col items-center justify-center rounded-none h-full">
-              <Settings className="h-5 w-5" />
-              <span className="text-xs mt-1">Settings</span>
+            <Button 
+              variant={activeSection === "transactions" ? "default" : "ghost"} 
+              className="flex flex-col items-center justify-center rounded-none h-full"
+              onClick={() => setActiveSection("transactions")}
+            >
+              <Clock className="h-5 w-5" />
+              <span className="text-xs mt-1">History</span>
+            </Button>
+            <Button 
+              variant={activeSection === "profile" ? "default" : "ghost"} 
+              className="flex flex-col items-center justify-center rounded-none h-full"
+              onClick={() => setActiveSection("profile")}
+            >
+              <User className="h-5 w-5" />
+              <span className="text-xs mt-1">Profile</span>
             </Button>
           </div>
         </nav>
+        
+        {/* Trade Dialog */}
+        <Dialog open={isTradeDialogOpen} onOpenChange={setIsTradeDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {tradeType === 'BUY' ? 'Buy' : 'Sell'} {selectedStock?.symbol}
+              </DialogTitle>
+              <DialogDescription>
+                {selectedStock?.name} - ${selectedStock?.currentPrice.toFixed(2)}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div className="flex justify-between items-center">
+                <p className="text-sm font-medium">Available Balance:</p>
+                <p className="text-sm font-bold">${userProfile?.balance.toFixed(2) || "0.00"}</p>
+              </div>
+              
+              {tradeType === 'SELL' && (
+                <div className="flex justify-between items-center">
+                  <p className="text-sm font-medium">Shares Owned:</p>
+                  <p className="text-sm font-bold">
+                    {portfolioItems.find(item => item.stockId === selectedStock?.id)?.quantity || 0}
+                  </p>
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Quantity</label>
+                <div className="flex items-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTradeQuantity(Math.max(1, tradeQuantity - 1))}
+                    disabled={tradeQuantity <= 1}
+                  >
+                    -
+                  </Button>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={tradeQuantity}
+                    onChange={(e) => setTradeQuantity(parseInt(e.target.value) || 1)}
+                    className="mx-2 text-center"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTradeQuantity(tradeQuantity + 1)}
+                  >
+                    +
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="flex justify-between items-center pt-4 border-t">
+                <p className="text-sm font-medium">Total Value:</p>
+                <p className="text-lg font-bold">${calculateTradeValue().toFixed(2)}</p>
+              </div>
+              
+              {tradeType === 'BUY' && calculateTradeValue() > (userProfile?.balance || 0) && (
+                <div className="text-red-500 text-sm">
+                  Insufficient balance for this transaction
+                </div>
+              )}
+              
+              {tradeType === 'SELL' && 
+                tradeQuantity > (portfolioItems.find(item => item.stockId === selectedStock?.id)?.quantity || 0) && (
+                <div className="text-red-500 text-sm">
+                  You don't own enough shares for this transaction
+                </div>
+              )}
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsTradeDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={executeTrade}
+                disabled={
+                  (tradeType === 'BUY' && calculateTradeValue() > (userProfile?.balance || 0)) ||
+                  (tradeType === 'SELL' && tradeQuantity > (portfolioItems.find(item => item.stockId === selectedStock?.id)?.quantity || 0))
+                }
+              >
+                Confirm {tradeType === 'BUY' ? 'Purchase' : 'Sale'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </>
   );
