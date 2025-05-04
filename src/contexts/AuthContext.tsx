@@ -73,6 +73,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           .insert({
             id: user.id,
             email: user.email,
+            name: user.user_metadata?.full_name || null,
+            avatarUrl: user.user_metadata?.avatar_url || null,
+            balance: 10000, // Default virtual money for paper trading
           });
         if (insertError) {
           throw insertError;
