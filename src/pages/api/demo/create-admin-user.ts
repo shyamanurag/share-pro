@@ -8,6 +8,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Set cache control headers to prevent caching
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
   try {
     console.log('Starting admin user creation/verification process');
     const supabase = createClient(req, res);
@@ -26,14 +31,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     // First, try to get the user by email from Supabase
     console.log('Checking if admin user exists in Supabase');
-    const { data: { users }, error: getUserError } = await supabase.auth.admin.listUsers();
+    const { data: { users }, error: getUserError } = await supabase.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000, // Get all users to ensure we find the admin
+    });
     
     if (getUserError) {
       console.error('Error listing users:', getUserError);
-      return res.status(500).json({ error: 'Failed to check if admin user exists' });
+      return res.status(500).json({ error: 'Failed to check if admin user exists', details: getUserError.message });
     }
     
+    console.log(`Found ${users?.length || 0} users in Supabase`);
     const existingUser = users?.find(u => u.email === adminEmail);
+    console.log('Existing admin user in Supabase:', existingUser ? 'Found' : 'Not found');
+    
     let adminUser = existingUser;
     let adminId = existingUser?.id;
     

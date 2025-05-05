@@ -663,12 +663,30 @@ export default function AdminDashboard() {
     }, 1500);
   };
 
-  // Check if user is admin (in a real app, this would be a proper check)
-  const isAdmin = user && user.email === "admin@tradepaper.com";
+  // Check if user is admin - more robust check
+  const isAdmin = user && (
+    user.email === "admin@tradepaper.com" || 
+    user.user_metadata?.role === "ADMIN" ||
+    user.app_metadata?.role === "ADMIN"
+  );
+
+  useEffect(() => {
+    if (user && !isAdmin) {
+      console.log('User is not admin, redirecting to dashboard');
+      router.replace('/dashboard-india');
+    } else if (!user) {
+      console.log('No user found, redirecting to admin login');
+      router.replace('/admin-login');
+    }
+  }, [user, isAdmin, router]);
 
   if (!user) {
-    router.push('/admin-login');
-    return null;
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <h1 className="text-2xl font-bold mb-4">Loading...</h1>
+        <p className="text-muted-foreground mb-6">Please wait while we check your credentials.</p>
+      </div>
+    );
   }
 
   if (!isAdmin) {

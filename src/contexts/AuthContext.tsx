@@ -93,8 +93,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signIn = async (email: string, password: string) => {
     // Clear any existing auth state first
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('supabase.auth.token');
-      sessionStorage.removeItem('supabase.auth.token');
+      console.log('Clearing auth state before sign in');
+      localStorage.clear(); // Clear all localStorage
+      sessionStorage.clear(); // Clear all sessionStorage
+      
+      // Also clear any service worker registrations for admin login
+      if ('serviceWorker' in navigator && email.includes('admin')) {
+        console.log('Unregistering service workers for admin login');
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const registration of registrations) {
+          await registration.unregister();
+        }
+        
+        // Also clear caches
+        if ('caches' in window) {
+          console.log('Clearing caches for admin login');
+          const cacheKeys = await caches.keys();
+          await Promise.all(cacheKeys.map(key => caches.delete(key)));
+        }
+      }
     }
     
     console.log(`Attempting to sign in with email: ${email}`);
@@ -109,11 +126,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     
     // Now attempt to sign in
+    console.log('Calling supabase.auth.signInWithPassword');
     const { data, error } = await supabase.auth.signInWithPassword({ 
       email, 
       password,
       options: {
-        redirectTo: email.includes('admin') ? `${window.location.origin}/admin` : `${window.location.origin}/dashboard-india`
+        // Don't use redirectTo for admin users, we'll handle that manually
+        redirectTo: email.includes('admin') ? undefined : `${window.location.origin}/dashboard-india`
       }
     });
     
@@ -128,7 +147,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } 
     
     if (data.user) {
-      console.log('Sign in successful, creating/updating user profile');
+      console.log('Sign in successful, user data:', data.user);
+      
+      // For admin users, check if they have the admin role in user_metadata
+      if (email.includes('admin')) {
+        console.log('Admin user detected, checking metadata');
+        if (!data.user.user_metadata?.role || data.user.user_metadata.role !== 'ADMIN') {
+          console.log('Setting admin role in user metadata');
+          // Update user metadata to include admin role
+          await supabase.auth.updateUser({
+            data: { role: 'ADMIN' }
+          });
+        }
+      }
+      
+      console.log('Creating/updating user profile');
       await createUser(data.user);
       
       toast({

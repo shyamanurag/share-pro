@@ -138,15 +138,25 @@ const AdminLoginPage = () => {
     try {
       // Clear any existing auth state first
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('supabase.auth.token');
-        sessionStorage.removeItem('supabase.auth.token');
+        console.log('Clearing local storage and session storage');
+        localStorage.clear(); // Clear all localStorage, not just auth token
+        sessionStorage.clear(); // Clear all sessionStorage
         
         // Also clear any service worker registrations
         if ('serviceWorker' in navigator) {
+          console.log('Unregistering service workers');
           const registrations = await navigator.serviceWorker.getRegistrations();
           for (const registration of registrations) {
             await registration.unregister();
             console.log('Unregistered service worker before admin login');
+          }
+          
+          // Also clear caches
+          if ('caches' in window) {
+            console.log('Clearing caches');
+            const cacheKeys = await caches.keys();
+            await Promise.all(cacheKeys.map(key => caches.delete(key)));
+            console.log('Caches cleared');
           }
         }
       }
@@ -156,6 +166,7 @@ const AdminLoginPage = () => {
       console.log('Attempting admin login with:', email);
       
       // First ensure the admin user exists with no-cache headers
+      console.log('Setting up admin account...');
       const setupResponse = await fetch('/api/demo/create-admin-user', {
         method: 'POST',
         headers: {
@@ -163,6 +174,8 @@ const AdminLoginPage = () => {
           'Pragma': 'no-cache',
           'Expires': '0'
         },
+        // Add a cache-busting query parameter
+        cache: 'no-store',
       });
       
       const setupData = await setupResponse.json();
@@ -175,11 +188,16 @@ const AdminLoginPage = () => {
       console.log('Admin setup successful, proceeding to sign in');
       
       // Then attempt to sign in
-      await signIn(email, password);
-      console.log('Sign in successful, redirecting to admin page');
+      console.log('Signing in with email and password');
+      const user = await signIn(email, password);
+      console.log('Sign in successful, user:', user);
       
+      // Add a small delay to ensure auth state is updated
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      console.log('Redirecting to admin page');
       // Use replace instead of push to avoid history issues
-      router.replace('/admin');
+      window.location.href = '/admin'; // Use direct location change instead of router
     } catch (error) {
       console.error('Login error:', error);
       toast({
