@@ -555,18 +555,23 @@ export default function Dashboard() {
                                     <Badge variant="outline" className="text-xs">
                                       {stock.sector}
                                     </Badge>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon" 
-                                      className="h-8 w-8"
-                                      onClick={() => toggleWatchlist(stock.id)}
-                                    >
-                                      {watchlistStockIds.includes(stock.id) ? (
-                                        <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                                      ) : (
-                                        <Star className="h-4 w-4 text-muted-foreground" />
-                                      )}
-                                    </Button>
+                                    <div className="relative group">
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-8 w-8 relative"
+                                        onClick={() => toggleWatchlist(stock.id)}
+                                      >
+                                        {watchlistStockIds.includes(stock.id) ? (
+                                          <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                                        ) : (
+                                          <Star className="h-4 w-4 text-muted-foreground" />
+                                        )}
+                                      </Button>
+                                      <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-50">
+                                        {watchlistStockIds.includes(stock.id) ? 'Remove from watchlist' : 'Add to watchlist'}
+                                      </div>
+                                    </div>
                                   </div>
                                   <p className="text-sm text-muted-foreground">{stock.name}</p>
                                 </div>
@@ -934,14 +939,19 @@ export default function Dashboard() {
                                       <Badge variant="outline" className="text-xs">
                                         {item.stock.sector}
                                       </Badge>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className="h-8 w-8"
-                                        onClick={() => toggleWatchlist(item.stockId)}
-                                      >
-                                        <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                                      </Button>
+                                      <div className="relative group">
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          className="h-8 w-8 relative"
+                                          onClick={() => toggleWatchlist(item.stockId)}
+                                        >
+                                          <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                                        </Button>
+                                        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-50">
+                                          Remove from watchlist
+                                        </div>
+                                      </div>
                                     </div>
                                     <p className="text-sm text-muted-foreground">{item.stock.name}</p>
                                   </div>
@@ -1317,145 +1327,370 @@ export default function Dashboard() {
                 </TabsContent>
                 
                 <TabsContent value="add-money" className="mt-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Add Money to Your Account</CardTitle>
-                      <CardDescription>
-                        Add funds to your trading account using UPI or Card payment
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <form className="space-y-4" onSubmit={(e) => {
-                        e.preventDefault();
-                        const formData = new FormData(e.currentTarget);
-                        const amount = formData.get('amount') as string;
-                        const paymentMethod = formData.get('paymentMethod') as string;
-                        
-                        if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-                          toast({
-                            variant: "destructive",
-                            title: "Invalid amount",
-                            description: "Please enter a valid amount greater than 0",
-                          });
-                          return;
-                        }
-                        
-                        setIsLoading(true);
-                        
-                        fetch('/api/user/add-money', {
-                          method: 'POST',
-                          headers: {
-                            'Content-Type': 'application/json',
-                          },
-                          body: JSON.stringify({
-                            amount: parseFloat(amount),
-                            paymentMethod,
-                          }),
-                        })
-                          .then(response => response.json())
-                          .then(data => {
-                            if (data.error) {
-                              throw new Error(data.error);
+                  <Tabs defaultValue="upi">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="upi">UPI</TabsTrigger>
+                      <TabsTrigger value="card">Card</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="upi" className="mt-4">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Add Money via UPI</CardTitle>
+                          <CardDescription>
+                            Add funds to your trading account using UPI payment
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <form className="space-y-4" onSubmit={(e) => {
+                            e.preventDefault();
+                            const formData = new FormData(e.currentTarget);
+                            const amount = formData.get('amount') as string;
+                            const upiId = formData.get('upiId') as string;
+                            
+                            if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+                              toast({
+                                variant: "destructive",
+                                title: "Invalid amount",
+                                description: "Please enter a valid amount greater than 0",
+                              });
+                              return;
                             }
                             
-                            // Update user profile with new balance
-                            setUserProfile(data.user);
+                            if (!upiId || !upiId.includes('@')) {
+                              toast({
+                                variant: "destructive",
+                                title: "Invalid UPI ID",
+                                description: "Please enter a valid UPI ID (e.g., name@upi)",
+                              });
+                              return;
+                            }
                             
-                            toast({
-                              title: "Money Added Successfully",
-                              description: data.message,
-                            });
+                            setIsLoading(true);
                             
-                            // Reset form
-                            e.currentTarget.reset();
-                          })
-                          .catch(error => {
-                            console.error('Error adding money:', error);
-                            toast({
-                              variant: "destructive",
-                              title: "Failed to add money",
-                              description: error.message || "An error occurred while adding money",
-                            });
-                          })
-                          .finally(() => {
-                            setIsLoading(false);
-                          });
-                      }}>
-                        <div className="space-y-2">
-                          <label htmlFor="amount" className="text-sm font-medium">
-                            Amount (₹)
-                          </label>
-                          <Input
-                            id="amount"
-                            name="amount"
-                            type="number"
-                            placeholder="Enter amount"
-                            min="100"
-                            step="100"
-                            required
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">
-                            Payment Method
-                          </label>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="radio"
-                                id="upi"
-                                name="paymentMethod"
-                                value="UPI"
-                                className="h-4 w-4 border-gray-300 text-green-600 focus:ring-green-500"
-                                defaultChecked
-                              />
-                              <label htmlFor="upi" className="text-sm font-medium">
-                                UPI
+                            fetch('/api/user/add-money', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                              },
+                              body: JSON.stringify({
+                                amount: parseFloat(amount),
+                                paymentMethod: 'UPI',
+                                paymentDetails: { upiId }
+                              }),
+                            })
+                              .then(response => response.json())
+                              .then(data => {
+                                if (data.error) {
+                                  throw new Error(data.error);
+                                }
+                                
+                                // Update user profile with new balance
+                                setUserProfile(data.user);
+                                
+                                toast({
+                                  title: "Money Added Successfully",
+                                  description: data.message,
+                                });
+                                
+                                // Reset form
+                                e.currentTarget.reset();
+                              })
+                              .catch(error => {
+                                console.error('Error adding money:', error);
+                                toast({
+                                  variant: "destructive",
+                                  title: "Failed to add money",
+                                  description: error.message || "An error occurred while adding money",
+                                });
+                              })
+                              .finally(() => {
+                                setIsLoading(false);
+                              });
+                          }}>
+                            <div className="space-y-2">
+                              <label htmlFor="amount" className="text-sm font-medium">
+                                Amount (₹)
                               </label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="radio"
-                                id="card"
-                                name="paymentMethod"
-                                value="CARD"
-                                className="h-4 w-4 border-gray-300 text-green-600 focus:ring-green-500"
+                              <Input
+                                id="amount"
+                                name="amount"
+                                type="number"
+                                placeholder="Enter amount"
+                                min="100"
+                                step="100"
+                                required
                               />
-                              <label htmlFor="card" className="text-sm font-medium">
-                                Card
-                              </label>
                             </div>
-                          </div>
-                        </div>
-                        
-                        <div className="pt-4">
-                          <Button
-                            type="submit"
-                            className="w-full bg-green-600 hover:bg-green-700"
-                            disabled={isLoading}
-                          >
-                            {isLoading ? (
-                              <>
-                                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                                Processing...
-                              </>
-                            ) : (
-                              <>
-                                <IndianRupee className="mr-2 h-4 w-4" />
-                                Add Money
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                        
-                        <div className="mt-4 text-xs text-muted-foreground">
-                          <p className="mb-1">Note: This is a paper trading app. No real money will be charged.</p>
-                          <p>In a real app, this would redirect to a payment gateway.</p>
-                        </div>
-                      </form>
-                    </CardContent>
-                  </Card>
+                            
+                            <div className="space-y-2">
+                              <label htmlFor="upiId" className="text-sm font-medium">
+                                UPI ID
+                              </label>
+                              <Input
+                                id="upiId"
+                                name="upiId"
+                                type="text"
+                                placeholder="yourname@upi"
+                                required
+                              />
+                            </div>
+                            
+                            <div className="mt-4 p-4 bg-muted rounded-lg">
+                              <div className="flex justify-center mb-4">
+                                <div className="w-32 h-32 bg-white p-2 rounded-lg flex items-center justify-center">
+                                  <div className="text-center">
+                                    <div className="grid grid-cols-3 grid-rows-3 gap-1">
+                                      {Array(9).fill(0).map((_, i) => (
+                                        <div key={i} className="w-4 h-4 bg-black" />
+                                      ))}
+                                    </div>
+                                    <p className="text-xs mt-2 text-black">Scan QR Code</p>
+                                  </div>
+                                </div>
+                              </div>
+                              <p className="text-xs text-center text-muted-foreground">
+                                Scan this QR code with your UPI app or enter your UPI ID above
+                              </p>
+                            </div>
+                            
+                            <div className="pt-4">
+                              <Button
+                                type="submit"
+                                className="w-full bg-green-600 hover:bg-green-700"
+                                disabled={isLoading}
+                              >
+                                {isLoading ? (
+                                  <>
+                                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                    Processing...
+                                  </>
+                                ) : (
+                                  <>
+                                    <IndianRupee className="mr-2 h-4 w-4" />
+                                    Add Money
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                            
+                            <div className="mt-4 text-xs text-muted-foreground">
+                              <p className="mb-1">Note: This is a paper trading app. No real money will be charged.</p>
+                              <p>In a real app, this would redirect to a UPI payment gateway.</p>
+                            </div>
+                          </form>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                    
+                    <TabsContent value="card" className="mt-4">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Add Money via Card</CardTitle>
+                          <CardDescription>
+                            Add funds to your trading account using Credit/Debit Card
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <form className="space-y-4" onSubmit={(e) => {
+                            e.preventDefault();
+                            const formData = new FormData(e.currentTarget);
+                            const amount = formData.get('amount') as string;
+                            const cardNumber = formData.get('cardNumber') as string;
+                            const cardName = formData.get('cardName') as string;
+                            const expiryDate = formData.get('expiryDate') as string;
+                            const cvv = formData.get('cvv') as string;
+                            
+                            if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+                              toast({
+                                variant: "destructive",
+                                title: "Invalid amount",
+                                description: "Please enter a valid amount greater than 0",
+                              });
+                              return;
+                            }
+                            
+                            // Basic validation for card details
+                            if (!cardNumber || cardNumber.length < 16) {
+                              toast({
+                                variant: "destructive",
+                                title: "Invalid card number",
+                                description: "Please enter a valid card number",
+                              });
+                              return;
+                            }
+                            
+                            setIsLoading(true);
+                            
+                            fetch('/api/user/add-money', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                              },
+                              body: JSON.stringify({
+                                amount: parseFloat(amount),
+                                paymentMethod: 'CARD',
+                                paymentDetails: { 
+                                  cardNumber: cardNumber.replace(/\s/g, '').slice(-4), // Only store last 4 digits
+                                  cardName
+                                }
+                              }),
+                            })
+                              .then(response => response.json())
+                              .then(data => {
+                                if (data.error) {
+                                  throw new Error(data.error);
+                                }
+                                
+                                // Update user profile with new balance
+                                setUserProfile(data.user);
+                                
+                                toast({
+                                  title: "Money Added Successfully",
+                                  description: data.message,
+                                });
+                                
+                                // Reset form
+                                e.currentTarget.reset();
+                              })
+                              .catch(error => {
+                                console.error('Error adding money:', error);
+                                toast({
+                                  variant: "destructive",
+                                  title: "Failed to add money",
+                                  description: error.message || "An error occurred while adding money",
+                                });
+                              })
+                              .finally(() => {
+                                setIsLoading(false);
+                              });
+                          }}>
+                            <div className="space-y-2">
+                              <label htmlFor="card-amount" className="text-sm font-medium">
+                                Amount (₹)
+                              </label>
+                              <Input
+                                id="card-amount"
+                                name="amount"
+                                type="number"
+                                placeholder="Enter amount"
+                                min="100"
+                                step="100"
+                                required
+                              />
+                            </div>
+                            
+                            <div className="p-4 border rounded-lg mt-4 bg-card">
+                              <div className="space-y-4">
+                                <div className="space-y-2">
+                                  <label htmlFor="cardNumber" className="text-sm font-medium">
+                                    Card Number
+                                  </label>
+                                  <Input
+                                    id="cardNumber"
+                                    name="cardNumber"
+                                    type="text"
+                                    placeholder="1234 5678 9012 3456"
+                                    maxLength={19}
+                                    required
+                                    onChange={(e) => {
+                                      // Format card number with spaces
+                                      const value = e.target.value.replace(/\s/g, '');
+                                      const formattedValue = value.replace(/(\d{4})/g, '$1 ').trim();
+                                      e.target.value = formattedValue;
+                                    }}
+                                  />
+                                </div>
+                                
+                                <div className="space-y-2">
+                                  <label htmlFor="cardName" className="text-sm font-medium">
+                                    Name on Card
+                                  </label>
+                                  <Input
+                                    id="cardName"
+                                    name="cardName"
+                                    type="text"
+                                    placeholder="John Doe"
+                                    required
+                                  />
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div className="space-y-2">
+                                    <label htmlFor="expiryDate" className="text-sm font-medium">
+                                      Expiry Date
+                                    </label>
+                                    <Input
+                                      id="expiryDate"
+                                      name="expiryDate"
+                                      type="text"
+                                      placeholder="MM/YY"
+                                      maxLength={5}
+                                      required
+                                      onChange={(e) => {
+                                        // Format expiry date
+                                        const value = e.target.value.replace(/\D/g, '');
+                                        if (value.length <= 2) {
+                                          e.target.value = value;
+                                        } else {
+                                          e.target.value = `${value.slice(0, 2)}/${value.slice(2, 4)}`;
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                  
+                                  <div className="space-y-2">
+                                    <label htmlFor="cvv" className="text-sm font-medium">
+                                      CVV
+                                    </label>
+                                    <Input
+                                      id="cvv"
+                                      name="cvv"
+                                      type="password"
+                                      placeholder="123"
+                                      maxLength={3}
+                                      required
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center justify-end mt-4 space-x-2">
+                                <div className="w-10 h-6 bg-blue-600 rounded"></div>
+                                <div className="w-10 h-6 bg-red-500 rounded-full"></div>
+                                <div className="w-10 h-6 bg-yellow-400 rounded"></div>
+                              </div>
+                            </div>
+                            
+                            <div className="pt-4">
+                              <Button
+                                type="submit"
+                                className="w-full bg-green-600 hover:bg-green-700"
+                                disabled={isLoading}
+                              >
+                                {isLoading ? (
+                                  <>
+                                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                    Processing...
+                                  </>
+                                ) : (
+                                  <>
+                                    <IndianRupee className="mr-2 h-4 w-4" />
+                                    Add Money
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                            
+                            <div className="mt-4 text-xs text-muted-foreground">
+                              <p className="mb-1">Note: This is a paper trading app. No real money will be charged.</p>
+                              <p>In a real app, this would use a secure payment processor.</p>
+                            </div>
+                          </form>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                  </Tabs>
                 </TabsContent>
               </Tabs>
             </>
