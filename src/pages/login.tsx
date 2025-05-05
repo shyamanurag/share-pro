@@ -69,18 +69,34 @@ const LoginPage = () => {
     try {
       // Clear any existing auth state first
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('supabase.auth.token');
-        sessionStorage.removeItem('supabase.auth.token');
+        console.log('Clearing browser storage and cache');
+        localStorage.clear();
+        sessionStorage.clear();
+        
+        // Unregister service workers
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (const registration of registrations) {
+            await registration.unregister();
+          }
+        }
+        
+        // Clear caches
+        if ('caches' in window) {
+          const cacheKeys = await caches.keys();
+          await Promise.all(cacheKeys.map(key => caches.delete(key)));
+        }
       }
       
-      const { email, password } = formik.values;
+      const { email, password }  = formik.values;
       console.log(`Attempting login with email: ${email}`);
       
       // First ensure the demo user exists if using demo credentials
       if (email === 'demo@papertrader.app') {
         try {
           console.log('Creating/verifying demo user before login');
-          await fetch('/api/demo/create-demo-user', {
+          const timestamp = new Date().getTime(); // Add timestamp to prevent caching
+          await fetch(`/api/demo/create-demo-user?t=${timestamp}`, {
             method: 'POST',
             headers: {
               'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -93,12 +109,25 @@ const LoginPage = () => {
         }
       }
       
+      // Sign out first to ensure clean state
+      try {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+        console.log('Signed out any existing session');
+      } catch (signOutError) {
+        console.error('Error during pre-login signout:', signOutError);
+        // Continue anyway
+      }
+      
+      // Wait a moment to ensure signout is complete
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       // Attempt sign in
       await signIn(email, password);
       console.log('Login successful, redirecting to dashboard');
       
-      // Use replace instead of push to avoid history issues
-      router.replace('/dashboard-india');
+      // Use direct location change for more reliable navigation
+      window.location.href = '/dashboard-india';
     } catch (error) {
       console.error('Login error:', error);
       toast({

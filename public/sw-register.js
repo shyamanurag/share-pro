@@ -1,13 +1,19 @@
-// Immediately clear any caches on page load
+// Immediately clear ALL caches on page load
 if ('caches' in window) {
   caches.keys().then(function(cacheNames) {
     cacheNames.forEach(function(cacheName) {
-      if (cacheName.startsWith('tradepaper')) {
-        console.log('Deleting cache:', cacheName);
-        caches.delete(cacheName);
-      }
+      console.log('Deleting cache:', cacheName);
+      caches.delete(cacheName);
     });
   });
+}
+
+// Clear localStorage and sessionStorage
+if (typeof window !== 'undefined') {
+  // Only clear auth-related items to preserve other settings
+  localStorage.removeItem('supabase.auth.token');
+  sessionStorage.removeItem('supabase.auth.token');
+  console.log('Cleared auth tokens from storage');
 }
 
 if ('serviceWorker' in navigator) {

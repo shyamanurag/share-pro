@@ -138,66 +138,71 @@ const AdminLoginPage = () => {
     try {
       // Clear any existing auth state first
       if (typeof window !== 'undefined') {
-        console.log('Clearing local storage and session storage');
-        localStorage.clear(); // Clear all localStorage, not just auth token
-        sessionStorage.clear(); // Clear all sessionStorage
+        console.log('Clearing browser storage and cache');
+        localStorage.clear();
+        sessionStorage.clear();
         
-        // Also clear any service worker registrations
+        // Unregister service workers
         if ('serviceWorker' in navigator) {
-          console.log('Unregistering service workers');
           const registrations = await navigator.serviceWorker.getRegistrations();
           for (const registration of registrations) {
             await registration.unregister();
-            console.log('Unregistered service worker before admin login');
           }
-          
-          // Also clear caches
-          if ('caches' in window) {
-            console.log('Clearing caches');
-            const cacheKeys = await caches.keys();
-            await Promise.all(cacheKeys.map(key => caches.delete(key)));
-            console.log('Caches cleared');
-          }
+        }
+        
+        // Clear caches
+        if ('caches' in window) {
+          const cacheKeys = await caches.keys();
+          await Promise.all(cacheKeys.map(key => caches.delete(key)));
         }
       }
       
       const { email, password } = formik.values;
       
-      console.log('Attempting admin login with:', email);
-      
-      // First ensure the admin user exists with no-cache headers
+      // First ensure the admin user exists with cache-busting
       console.log('Setting up admin account...');
-      const setupResponse = await fetch('/api/demo/create-admin-user', {
+      const timestamp = new Date().getTime(); // Add timestamp to prevent caching
+      const setupResponse = await fetch(`/api/demo/create-admin-user?t=${timestamp}`, {
         method: 'POST',
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
           'Expires': '0'
-        },
-        // Add a cache-busting query parameter
-        cache: 'no-store',
+        }
       });
       
       const setupData = await setupResponse.json();
       
       if (!setupResponse.ok) {
-        console.error('Error setting up admin account before login:', setupData);
+        console.error('Error setting up admin account:', setupData);
         throw new Error(setupData.error || 'Failed to setup admin account');
       }
       
       console.log('Admin setup successful, proceeding to sign in');
       
-      // Then attempt to sign in
-      console.log('Signing in with email and password');
-      const user = await signIn(email, password);
-      console.log('Sign in successful, user:', user);
+      // Sign out first to ensure clean state
+      try {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+        console.log('Signed out any existing session');
+      } catch (signOutError) {
+        console.error('Error during pre-login signout:', signOutError);
+        // Continue anyway
+      }
       
-      // Add a small delay to ensure auth state is updated
+      // Wait a moment to ensure signout is complete
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Attempt to sign in
+      console.log('Signing in with email and password');
+      await signIn(email, password);
+      
+      // Wait for auth state to update
       await new Promise(resolve => setTimeout(resolve, 500));
       
       console.log('Redirecting to admin page');
-      // Use replace instead of push to avoid history issues
-      window.location.href = '/admin'; // Use direct location change instead of router
+      // Use direct location change for more reliable navigation
+      window.location.href = '/admin';
     } catch (error) {
       console.error('Login error:', error);
       toast({

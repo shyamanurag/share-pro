@@ -94,20 +94,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Clear any existing auth state first
     if (typeof window !== 'undefined') {
       console.log('Clearing auth state before sign in');
-      localStorage.clear(); // Clear all localStorage
-      sessionStorage.clear(); // Clear all sessionStorage
+      localStorage.clear();
+      sessionStorage.clear();
       
-      // Also clear any service worker registrations for admin login
-      if ('serviceWorker' in navigator && email.includes('admin')) {
-        console.log('Unregistering service workers for admin login');
+      // Clear service worker registrations and caches
+      if ('serviceWorker' in navigator) {
+        console.log('Unregistering service workers');
         const registrations = await navigator.serviceWorker.getRegistrations();
         for (const registration of registrations) {
           await registration.unregister();
         }
         
-        // Also clear caches
         if ('caches' in window) {
-          console.log('Clearing caches for admin login');
+          console.log('Clearing caches');
           const cacheKeys = await caches.keys();
           await Promise.all(cacheKeys.map(key => caches.delete(key)));
         }
@@ -116,18 +115,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     console.log(`Attempting to sign in with email: ${email}`);
     
-    // First try to sign out to ensure a clean state
+    // First sign out to ensure a clean state
     try {
       await supabase.auth.signOut();
       console.log('Successfully signed out before new sign in');
+      
+      // Wait a moment to ensure signout is complete
+      await new Promise(resolve => setTimeout(resolve, 300));
     } catch (signOutError) {
       console.error('Error during pre-signin signout:', signOutError);
       // Continue anyway
     }
     
-    // Now attempt to sign in
+    // Create a fresh Supabase client to avoid any cached state
+    const freshSupabase = createClient();
+    
+    // Now attempt to sign in with the fresh client
     console.log('Calling supabase.auth.signInWithPassword');
-    const { data, error } = await supabase.auth.signInWithPassword({ 
+    const { data, error } = await freshSupabase.auth.signInWithPassword({ 
       email, 
       password,
       options: {
@@ -149,28 +154,34 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (data.user) {
       console.log('Sign in successful, user data:', data.user);
       
-      // For admin users, check if they have the admin role in user_metadata
+      // For admin users, ensure they have the admin role
       if (email.includes('admin')) {
-        console.log('Admin user detected, checking metadata');
-        if (!data.user.user_metadata?.role || data.user.user_metadata.role !== 'ADMIN') {
-          console.log('Setting admin role in user metadata');
-          // Update user metadata to include admin role
-          await supabase.auth.updateUser({
+        console.log('Admin user detected, updating metadata');
+        // Always update user metadata to include admin role
+        try {
+          await freshSupabase.auth.updateUser({
             data: { role: 'ADMIN' }
           });
+          console.log('Admin role set in user metadata');
+        } catch (updateError) {
+          console.error('Error updating user metadata:', updateError);
+          // Continue anyway
         }
       }
       
       console.log('Creating/updating user profile');
       await createUser(data.user);
       
+      // Refresh the user data after metadata update
+      const { data: refreshedData } = await freshSupabase.auth.getUser();
+      
       toast({
         title: "Success",
         description: "You have successfully signed in",
       });
       
-      // Return the user for additional processing
-      return data.user;
+      // Return the refreshed user data
+      return refreshedData?.user || data.user;
     } else {
       console.error('Sign in returned no user data');
       toast({
