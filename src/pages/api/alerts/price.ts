@@ -3,7 +3,7 @@ import { createClient } from '@/util/supabase/api';
 import prisma from '@/lib/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const supabase = createClient(req);
+  const supabase = createClient(req, res);
   const { data: { user }, error } = await supabase.auth.getUser();
 
   if (error || !user) {
