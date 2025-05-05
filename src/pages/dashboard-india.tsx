@@ -193,13 +193,19 @@ export default function Dashboard() {
   // Load initial data
   useEffect(() => {
     if (user) {
+      // Check if user is admin and redirect to admin page
+      if (user.email === "admin@tradepaper.com") {
+        router.push('/admin');
+        return;
+      }
+      
       fetchStocks();
       fetchWatchlist();
       fetchPortfolio();
       fetchTransactions();
       fetchUserProfile();
     }
-  }, [user]);
+  }, [user, router]);
 
   // Filter stocks based on search query
   const filteredStocks = stocks.filter(stock => 
