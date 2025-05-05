@@ -214,10 +214,22 @@ export default function AdminDashboard() {
     totalExposure: 750000
   });
 
-  // Fetch admin dashboard data
+  // Create admin user if needed and fetch admin dashboard data
   useEffect(() => {
+    const setupAdmin = async () => {
+      try {
+        // Ensure admin user exists
+        await fetch('/api/demo/create-admin-user', {
+          method: 'POST',
+        });
+      } catch (error) {
+        console.error('Error setting up admin account:', error);
+      }
+    };
+
     if (user) {
       setIsLoading(true);
+      setupAdmin();
       
       // Mock users data for demo
       const mockUsers: UserProfile[] = [
@@ -641,7 +653,7 @@ export default function AdminDashboard() {
   const isAdmin = user && user.email === "admin@tradepaper.com";
 
   if (!user) {
-    router.push('/login');
+    router.push('/admin-login');
     return null;
   }
 

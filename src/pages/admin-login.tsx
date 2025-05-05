@@ -4,17 +4,15 @@ import * as Yup from 'yup';
 import { useRouter } from 'next/navigation';
 import { AuthContext } from '@/contexts/AuthContext';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
-import GoogleButton from '@/components/GoogleButton';
 import Logo from '@/components/Logo';
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { useIsIFrame } from '@/hooks/useIsIFrame';
 
-const LoginPage = () => {
+const AdminLoginPage = () => {
   const router = useRouter();
   const { initializing, signIn } = useContext(AuthContext);
   const [showPw, setShowPw] = useState(false);
@@ -22,13 +20,28 @@ const LoginPage = () => {
   const { isIframe } = useIsIFrame();
   const { toast } = useToast();
 
+  // Ensure admin user exists in the database
+  useEffect(() => {
+    const setupAdmin = async () => {
+      try {
+        await fetch('/api/demo/create-admin-user', {
+          method: 'POST',
+        });
+      } catch (error) {
+        console.error('Error setting up admin account:', error);
+      }
+    };
+    
+    setupAdmin();
+  }, []);
+
   const handleLogin = async (e: any) => {
     e.preventDefault();
     setIsLoading(true);
     try {
       const { email, password } = formik.values;
       await signIn(email, password);
-      router.push('/dashboard');
+      router.push('/admin');
     } catch (error) {
       console.error(error);
       toast({
@@ -51,8 +64,8 @@ const LoginPage = () => {
 
   const formik = useFormik({
     initialValues: {
-      email: '',
-      password: '',
+      email: 'admin@tradepaper.com',
+      password: 'demo1234',
     },
     validationSchema,
     onSubmit: handleLogin,
@@ -74,65 +87,13 @@ const LoginPage = () => {
 
         <Card className="w-full md:w-[440px]" onKeyDown={handleKeyPress}>
           <CardHeader>
-            <CardTitle className="text-center">Log in</CardTitle>
+            <CardTitle className="text-center">Admin Login</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col gap-4">
-              <GoogleButton />
-              <Button
-                onClick={(e) => {
-                  e.preventDefault();
-                  router.push('/magic-link-login');
-                }}
-                variant="outline"
-              >
-                Continue with Magic Link
-              </Button>
-              <Button
-                onClick={async (e) => {
-                  e.preventDefault();
-                  setIsLoading(true);
-                  
-                  try {
-                    // Ensure demo user exists
-                    await fetch('/api/demo/create-demo-user', {
-                      method: 'POST',
-                    });
-                    
-                    // Set demo credentials
-                    formik.setFieldValue('email', 'demo@papertrader.app');
-                    formik.setFieldValue('password', 'demo1234');
-                    
-                    // Submit form after a short delay to allow field values to update
-                    setTimeout(() => {
-                      handleLogin(e);
-                    }, 100);
-                  } catch (error) {
-                    console.error('Error setting up demo account:', error);
-                    toast({
-                      variant: "destructive",
-                      title: "Demo login failed",
-                      description: "Unable to set up demo account. Please try again.",
-                    });
-                    setIsLoading(false);
-                  }
-                }}
-                variant="secondary"
-                className="bg-amber-500 hover:bg-amber-600 text-white"
-              >
-                Try Demo Account
-              </Button>
-            </div>
             <form onSubmit={handleLogin}>
               <div className="flex flex-col gap-6">
-                <div className="flex items-center w-full">
-                  <Separator className="flex-1" />
-                  <span className="mx-4 text-muted-foreground text-sm font-semibold whitespace-nowrap">or</span>
-                  <Separator className="flex-1" />
-                </div>
-
                 <div className="flex flex-col gap-6">
-                  <p className="text-center text-sm text-muted-foreground">Enter your credentials</p>
+                  <p className="text-center text-sm text-muted-foreground">Enter admin credentials</p>
                   <div className="flex flex-col gap-4">
                     <div className="flex flex-col gap-2">
                       <Label htmlFor="email">Email</Label>
@@ -140,7 +101,7 @@ const LoginPage = () => {
                         id="email"
                         name="email"
                         type="email"
-                        placeholder="Enter your email"
+                        placeholder="Enter admin email"
                         value={formik.values.email}
                         onChange={formik.handleChange}
                         onBlur={formik.handleBlur}
@@ -157,7 +118,7 @@ const LoginPage = () => {
                           id="password"
                           name="password"
                           type={showPw ? 'text' : 'password'}
-                          placeholder="Enter your password"
+                          placeholder="Enter admin password"
                           value={formik.values.password}
                           onChange={formik.handleChange}
                           onBlur={formik.handleBlur}
@@ -179,38 +140,6 @@ const LoginPage = () => {
                         <p className="text-destructive text-xs">{formik.errors.password}</p>
                       )}
                     </div>
-
-                    <div className="flex justify-between mt-2 text-sm">
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <span>Need an account?</span>
-                        <Button
-                          type="button"
-                          variant="link"
-                          className="p-0"
-                          onClick={() => router.push('/signup')}
-                        >
-                          Sign up
-                        </Button>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="link"
-                        className="p-0"
-                        onClick={() => router.push('/forgot-password')}
-                      >
-                        Forgot password?
-                      </Button>
-                    </div>
-                    <div className="flex justify-center mt-2 text-sm">
-                      <Button
-                        type="button"
-                        variant="link"
-                        className="p-0 text-muted-foreground"
-                        onClick={() => router.push('/admin-login')}
-                      >
-                        Admin Login
-                      </Button>
-                    </div>
                   </div>
                 </div>
                 <Button
@@ -219,7 +148,15 @@ const LoginPage = () => {
                   disabled={isLoading || initializing || !formik.values.email || !formik.values.password || !formik.isValid}
                   onClick={handleLogin}
                 >
-                  Continue
+                  {isLoading ? "Logging in..." : "Login as Admin"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => router.push('/login')}
+                >
+                  Back to Regular Login
                 </Button>
               </div>
             </form>
@@ -230,4 +167,4 @@ const LoginPage = () => {
   );
 };
 
-export default LoginPage;
+export default AdminLoginPage;
