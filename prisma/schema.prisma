@@ -9,32 +9,47 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 model User {
-  id         String   @id @db.Uuid
-  email      String   @unique
-  createdAt  DateTime @default(now())
-  name       String?
-  avatarUrl  String?
-  balance    Float    @default(10000) // Default virtual money for paper trading
-  portfolios Portfolio[]
-  watchlists Watchlist[]
-  transactions Transaction[]
+  id                String   @id @db.Uuid
+  email             String   @unique
+  createdAt         DateTime @default(now())
+  name              String?
+  avatarUrl         String?
+  balance           Float    @default(10000) // Default virtual money for paper trading
+  role              String   @default("USER") // "USER", "ADMIN"
+  isActive          Boolean  @default(true)
+  lastLogin         DateTime?
+  portfolios        Portfolio[]
+  watchlists        Watchlist[]
+  transactions      Transaction[]
+  futuresPositions  FuturesPosition[]
+  optionsPositions  OptionsPosition[]
+  riskProfile       RiskProfile?
+  orderAlerts       OrderAlert[]
+  bracketOrders     BracketOrder[]
 }
 
 model Stock {
-  id            String   @id @default(uuid())
-  symbol        String   @unique
-  name          String
-  currentPrice  Float
-  previousClose Float
-  change        Float
-  changePercent Float
-  volume        Int
-  marketCap     Float?
-  sector        String?
-  updatedAt     DateTime @default(now())
-  watchlistItems WatchlistItem[]
-  portfolioItems PortfolioItem[]
-  transactions   Transaction[]
+  id                String   @id @default(uuid())
+  symbol            String   @unique
+  name              String
+  currentPrice      Float
+  previousClose     Float
+  change            Float
+  changePercent     Float
+  volume            Int
+  marketCap         Float?
+  sector            String?
+  exchange          String   @default("NSE") // "NSE", "BSE"
+  isF_O_Available   Boolean  @default(false) // Whether F&O trading is available for this stock
+  lotSize           Int?     // Lot size for F&O trading
+  updatedAt         DateTime @default(now())
+  watchlistItems    WatchlistItem[]
+  portfolioItems    PortfolioItem[]
+  transactions      Transaction[]
+  futuresContracts  FuturesContract[]
+  optionsContracts  OptionsContract[]
+  orderAlerts       OrderAlert[]
+  bracketOrders     BracketOrder[]
 }
 
 model Watchlist {
@@ -81,14 +96,208 @@ model PortfolioItem {
 }
 
 model Transaction {
-  id        String   @id @default(uuid())
-  userId    String   @db.Uuid
-  stockId   String
-  type      String   // "BUY" or "SELL"
-  quantity  Int
-  price     Float
-  total     Float
-  timestamp DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
-  stock     Stock    @relation(fields: [stockId], references: [id])
+  id            String   @id @default(uuid())
+  userId        String   @db.Uuid
+  stockId       String
+  type          String   // "BUY" or "SELL"
+  orderType     String   @default("MARKET") // "MARKET", "LIMIT", "STOP_LOSS", "STOP_LIMIT"
+  quantity      Int
+  price         Float
+  total         Float
+  status        String   @default("COMPLETED") // "PENDING", "COMPLETED", "CANCELLED", "EXPIRED"
+  limitPrice    Float?   // For LIMIT and STOP_LIMIT orders
+  stopPrice     Float?   // For STOP_LOSS and STOP_LIMIT orders
+  expiryDate    DateTime? // For GTC (Good Till Cancelled) orders
+  timestamp     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id])
+  stock         Stock    @relation(fields: [stockId], references: [id])
+}
+
+// Models for F&O Trading
+model FuturesContract {
+  id              String   @id @default(uuid())
+  stockId         String
+  stock           Stock    @relation(fields: [stockId], references: [id])
+  expiryDate      DateTime
+  lotSize         Int
+  contractPrice   Float
+  marginRequired  Float
+  openInterest    Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  futuresPositions FuturesPosition[]
+}
+
+model OptionsContract {
+  id              String   @id @default(uuid())
+  stockId         String
+  stock           Stock    @relation(fields: [stockId], references: [id])
+  type            String   // "CALL" or "PUT"
+  strikePrice     Float
+  expiryDate      DateTime
+  lotSize         Int
+  premiumPrice    Float
+  openInterest    Int
+  impliedVolatility Float
+  delta           Float?
+  gamma           Float?
+  theta           Float?
+  vega            Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  optionsPositions OptionsPosition[]
+}
+
+model FuturesPosition {
+  id                String   @id @default(uuid())
+  userId            String   @db.Uuid
+  user              User     @relation(fields: [userId], references: [id])
+  futuresContractId String
+  futuresContract   FuturesContract @relation(fields: [futuresContractId], references: [id])
+  quantity          Int      // In lots
+  entryPrice        Float
+  currentPrice      Float
+  margin            Float
+  pnl               Float
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([userId, futuresContractId])
+}
+
+model OptionsPosition {
+  id                String   @id @default(uuid())
+  userId            String   @db.Uuid
+  user              User     @relation(fields: [userId], references: [id])
+  optionsContractId String
+  optionsContract   OptionsContract @relation(fields: [optionsContractId], references: [id])
+  quantity          Int      // In lots
+  entryPrice        Float
+  currentPrice      Float
+  pnl               Float
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([userId, optionsContractId])
+}
+
+// Models for Risk Management
+model RiskProfile {
+  id                String   @id @default(uuid())
+  userId            String   @db.Uuid @unique
+  user              User     @relation(fields: [userId], references: [id])
+  maxPositionSize   Float?   // Maximum position size as percentage of portfolio
+  maxDrawdown       Float?   // Maximum allowed drawdown percentage
+  riskPerTrade      Float?   // Risk percentage per trade
+  stopLossDefault   Float?   // Default stop loss percentage
+  takeProfitDefault Float?   // Default take profit percentage
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// Models for Advanced Order Types
+model OrderAlert {
+  id            String   @id @default(uuid())
+  userId        String   @db.Uuid
+  user          User     @relation(fields: [userId], references: [id])
+  stockId       String
+  stock         Stock    @relation(fields: [stockId], references: [id])
+  type          String   // "PRICE_ABOVE", "PRICE_BELOW", "PERCENT_CHANGE"
+  targetValue   Float
+  triggered     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BracketOrder {
+  id            String   @id @default(uuid())
+  userId        String   @db.Uuid
+  user          User     @relation(fields: [userId], references: [id])
+  stockId       String
+  stock         Stock    @relation(fields: [stockId], references: [id])
+  entryPrice    Float
+  quantity      Int
+  stopLoss      Float
+  takeProfit    Float
+  status        String   // "PENDING", "ACTIVE", "COMPLETED", "CANCELLED"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Models for Admin and System Monitoring
+model SystemLog {
+  id          String   @id @default(uuid())
+  level       String   // "INFO", "WARNING", "ERROR", "CRITICAL"
+  source      String   // Component that generated the log
+  message     String
+  details     String?  @db.Text
+  timestamp   DateTime @default(now())
+}
+
+model ApiUsage {
+  id          String   @id @default(uuid())
+  endpoint    String
+  method      String   // "GET", "POST", "PUT", "DELETE"
+  userId      String?  @db.Uuid
+  statusCode  Int
+  responseTime Int      // in milliseconds
+  timestamp   DateTime @default(now())
+}
+
+model MarketHours {
+  id          String   @id @default(uuid())
+  exchange    String   @unique // "NSE", "BSE"
+  openTime    String   // "09:15"
+  closeTime   String   // "15:30"
+  timezone    String   @default("Asia/Kolkata")
+  isActive    Boolean  @default(true)
+  holidays    MarketHoliday[]
+}
+
+model MarketHoliday {
+  id          String   @id @default(uuid())
+  marketId    String
+  market      MarketHours @relation(fields: [marketId], references: [id])
+  date        DateTime
+  name        String
+  description String?
+}
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+model UserActivity {
+  id          String   @id @default(uuid())
+  userId      String   @db.Uuid
+  action      String   // "LOGIN", "LOGOUT", "TRADE", "WATCHLIST_UPDATE", etc.
+  details     String?  @db.Text
+  ipAddress   String?
+  userAgent   String?
+  timestamp   DateTime @default(now())
+}
+
+model NotificationTemplate {
+  id          String   @id @default(uuid())
+  type        String   @unique // "PRICE_ALERT", "ORDER_EXECUTED", "MARGIN_CALL", etc.
+  subject     String
+  body        String   @db.Text
+  variables   String?  // JSON string of available variables
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model UserNotification {
+  id          String   @id @default(uuid())
+  userId      String   @db.Uuid
+  title       String
+  message     String
+  type        String   // "PRICE_ALERT", "ORDER_EXECUTED", "SYSTEM", etc.
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
 }
