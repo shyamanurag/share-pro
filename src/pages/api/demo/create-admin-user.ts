@@ -39,7 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     // If user doesn't exist in Supabase, create them
     if (!existingUser) {
-      console.log('Attempting to create admin user');
+      console.log('No admin user found in Supabase. Creating new admin user...');
       
       // Try to create the admin user with admin API to bypass email confirmation
       const { data: signUpData, error: signUpError } = await supabase.auth.admin.createUser({
@@ -102,6 +102,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         adminUser = signUpData?.user;
         adminId = adminUser?.id;
       }
+    } else {
+      console.log('Admin user found in Supabase. Ensuring password is correct...');
+      
+      // User exists, but let's make sure the password is correct
+      const { error: updateError } = await supabase.auth.admin.updateUserById(
+        existingUser.id,
+        { password: adminPassword }
+      );
+      
+      if (updateError) {
+        console.error('Failed to update admin password:', updateError);
+      } else {
+        console.log('Admin password updated/verified successfully');
+        adminId = existingUser.id;
+      }
     }
     
     // If we have an admin ID (either from sign in, sign up, or user lookup),
@@ -135,29 +150,69 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // If this is a new user, create default portfolio and watchlist
         if (!existingDbUser) {
           try {
-            // Create default portfolio
-            await prisma.portfolio.create({
-              data: {
-                id: randomUUID(),
-                name: 'Default Portfolio',
-                userId: adminId,
-              }
+            // Check if portfolio already exists
+            const existingPortfolio = await prisma.portfolio.findFirst({
+              where: { userId: adminId }
             });
             
-            // Create default watchlist
-            await prisma.watchlist.create({
-              data: {
-                id: randomUUID(),
-                name: 'Default Watchlist',
-                userId: adminId,
-              }
+            if (!existingPortfolio) {
+              // Create default portfolio
+              await prisma.portfolio.create({
+                data: {
+                  id: randomUUID(),
+                  name: 'Default Portfolio',
+                  userId: adminId,
+                }
+              });
+              console.log('Created default portfolio for admin user');
+            }
+            
+            // Check if watchlist already exists
+            const existingWatchlist = await prisma.watchlist.findFirst({
+              where: { userId: adminId }
             });
             
-            console.log('Created default portfolio and watchlist for admin user');
+            if (!existingWatchlist) {
+              // Create default watchlist
+              await prisma.watchlist.create({
+                data: {
+                  id: randomUUID(),
+                  name: 'Default Watchlist',
+                  userId: adminId,
+                }
+              });
+              console.log('Created default watchlist for admin user');
+            }
           } catch (err) {
             console.error('Error creating default portfolio/watchlist:', err);
             // Continue anyway as the user was created
           }
+        }
+        
+        // Force delete any existing sessions for this user to ensure clean login
+        try {
+          await supabase.auth.admin.deleteUser(adminId);
+          console.log('Deleted existing sessions for admin user');
+          
+          // Recreate the user with the same ID
+          const { error: recreateError } = await supabase.auth.admin.createUser({
+            email: adminEmail,
+            password: adminPassword,
+            user_metadata: {
+              full_name: 'Admin User',
+              role: 'ADMIN'
+            },
+            email_confirm: true
+          });
+          
+          if (recreateError) {
+            console.error('Error recreating admin user:', recreateError);
+          } else {
+            console.log('Admin user recreated successfully');
+          }
+        } catch (sessionError) {
+          console.error('Error managing admin sessions:', sessionError);
+          // Continue anyway
         }
         
         return res.status(200).json({ 
@@ -176,7 +231,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.error('Failed to create or retrieve admin user from Supabase Auth');
       return res.status(500).json({ 
         error: 'Failed to create or retrieve admin user',
-        signInError: signInError ? signInError.message : null
+        signInError: 'Unknown error during admin user creation'
       });
     }
   } catch (error) {

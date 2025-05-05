@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tradepaper-india-v2';
+const CACHE_NAME = 'tradepaper-india-v3';
 const urlsToCache = [
   '/',
   '/dashboard',
@@ -21,7 +21,7 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Skip caching for admin-related URLs, auth endpoints, API requests, and login-related pages
+  // Skip caching for any authentication, admin, or API related URLs
   if (
     event.request.url.includes('/admin') ||
     event.request.url.includes('/api/') ||
@@ -31,9 +31,24 @@ self.addEventListener('fetch', (event) => {
     event.request.url.includes('/signup') ||
     event.request.url.includes('/magic-link-login') ||
     event.request.url.includes('/reset-password') ||
-    event.request.url.includes('/forgot-password')
+    event.request.url.includes('/forgot-password') ||
+    // Add additional auth-related paths
+    event.request.url.includes('supabase') ||
+    event.request.url.includes('auth') ||
+    // Skip caching for POST requests which are likely auth-related
+    event.request.method === 'POST'
   ) {
-    return event.respondWith(fetch(event.request));
+    // Use no-cache for these requests to ensure fresh responses
+    return event.respondWith(
+      fetch(event.request, { 
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+    );
   }
   
   // For other requests, try the cache first

@@ -2,7 +2,7 @@
   "name": "TradePaper India",
   "short_name": "TradePaper",
   "description": "Paper trading app for practicing Indian stock market trading without risk",
-  "start_url": "/dashboard-india",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#FF9933",

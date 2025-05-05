@@ -136,6 +136,21 @@ const AdminLoginPage = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
+      // Clear any existing auth state first
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('supabase.auth.token');
+        sessionStorage.removeItem('supabase.auth.token');
+        
+        // Also clear any service worker registrations
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (const registration of registrations) {
+            await registration.unregister();
+            console.log('Unregistered service worker before admin login');
+          }
+        }
+      }
+      
       const { email, password } = formik.values;
       
       console.log('Attempting admin login with:', email);
@@ -162,14 +177,16 @@ const AdminLoginPage = () => {
       // Then attempt to sign in
       await signIn(email, password);
       console.log('Sign in successful, redirecting to admin page');
-      router.push('/admin');
+      
+      // Use replace instead of push to avoid history issues
+      router.replace('/admin');
     } catch (error) {
       console.error('Login error:', error);
       toast({
         variant: "destructive",
         title: "Login failed",
         description: error instanceof Error 
-          ? error.message 
+          ? `Error: ${error.message}` 
           : "Please check your credentials and try again.",
       });
     } finally {

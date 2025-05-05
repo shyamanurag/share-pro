@@ -67,15 +67,46 @@ const LoginPage = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
+      // Clear any existing auth state first
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('supabase.auth.token');
+        sessionStorage.removeItem('supabase.auth.token');
+      }
+      
       const { email, password } = formik.values;
+      console.log(`Attempting login with email: ${email}`);
+      
+      // First ensure the demo user exists if using demo credentials
+      if (email === 'demo@papertrader.app') {
+        try {
+          console.log('Creating/verifying demo user before login');
+          await fetch('/api/demo/create-demo-user', {
+            method: 'POST',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0'
+            },
+          });
+        } catch (demoError) {
+          console.error('Error setting up demo user:', demoError);
+        }
+      }
+      
+      // Attempt sign in
       await signIn(email, password);
-      router.push('/dashboard');
+      console.log('Login successful, redirecting to dashboard');
+      
+      // Use replace instead of push to avoid history issues
+      router.replace('/dashboard-india');
     } catch (error) {
-      console.error(error);
+      console.error('Login error:', error);
       toast({
         variant: "destructive",
         title: "Login failed",
-        description: "Please check your credentials and try again.",
+        description: error instanceof Error 
+          ? `Error: ${error.message}` 
+          : "Please check your credentials and try again.",
       });
     } finally {
       setIsLoading(false);
