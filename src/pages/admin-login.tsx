@@ -228,8 +228,8 @@ const AdminLoginPage = () => {
 
   const formik = useFormik({
     initialValues: {
-      email: 'admin@tradepaper.com',
-      password: 'demo1234',
+      email: 'admin@papertrader.app',
+      password: 'admin1234',
     },
     validationSchema,
     onSubmit: handleLogin,
@@ -324,8 +324,8 @@ const AdminLoginPage = () => {
                       });
                       
                       // Set admin credentials
-                      formik.setFieldValue('email', 'admin@tradepaper.com');
-                      formik.setFieldValue('password', 'demo1234');
+                      formik.setFieldValue('email', 'admin@papertrader.app');
+                      formik.setFieldValue('password', 'admin1234');
                       
                       // Submit form after a short delay to allow field values to update
                       setTimeout(() => {

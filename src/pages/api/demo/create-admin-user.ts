@@ -16,8 +16,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     console.log('Starting admin user creation/verification process');
     const supabase = createClient(req, res);
-    const adminEmail = 'admin@tradepaper.com';
-    const adminPassword = 'demo1234';
+    const adminEmail = 'admin@papertrader.app';
+    const adminPassword = 'admin1234';
     
     // First, try to delete the admin user if it exists to ensure a clean state
     try {

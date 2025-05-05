@@ -241,7 +241,7 @@ export default function AdminDashboard() {
       setIsLoading(true);
       
       // Only attempt to setup admin if the current user is an admin
-      if (user.email === "admin@tradepaper.com") {
+      if (user.email === "admin@papertrader.app") {
         setupAdmin();
       }
       
@@ -249,7 +249,7 @@ export default function AdminDashboard() {
       const mockUsers: UserProfile[] = [
         {
           id: "1",
-          email: "admin@tradepaper.com",
+          email: "admin@papertrader.app",
           name: "Admin User",
           avatarUrl: null,
           balance: 1000000,
@@ -665,7 +665,7 @@ export default function AdminDashboard() {
 
   // Check if user is admin - more robust check
   const isAdmin = user && (
-    user.email === "admin@tradepaper.com" || 
+    user.email === "admin@papertrader.app" || 
     user.user_metadata?.role === "ADMIN" ||
     user.app_metadata?.role === "ADMIN"
   );
@@ -812,7 +812,7 @@ export default function AdminDashboard() {
               </div>
               <div>
                 <p className="text-sm font-medium">Admin User</p>
-                <p className="text-xs text-muted-foreground">admin@tradepaper.com</p>
+                <p className="text-xs text-muted-foreground">admin@papertrader.app</p>
               </div>
             </div>
             <Button 
