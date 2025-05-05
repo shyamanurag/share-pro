@@ -219,9 +219,19 @@ export default function AdminDashboard() {
     const setupAdmin = async () => {
       try {
         // Ensure admin user exists
-        await fetch('/api/demo/create-admin-user', {
+        const response = await fetch('/api/demo/create-admin-user', {
           method: 'POST',
         });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Error setting up admin account:', errorData);
+          toast({
+            variant: "destructive",
+            title: "Admin Setup Error",
+            description: "There was an error setting up the admin account.",
+          });
+        }
       } catch (error) {
         console.error('Error setting up admin account:', error);
       }
@@ -229,7 +239,11 @@ export default function AdminDashboard() {
 
     if (user) {
       setIsLoading(true);
-      setupAdmin();
+      
+      // Only attempt to setup admin if the current user is an admin
+      if (user.email === "admin@tradepaper.com") {
+        setupAdmin();
+      }
       
       // Mock users data for demo
       const mockUsers: UserProfile[] = [

@@ -23,17 +23,35 @@ const AdminLoginPage = () => {
   // Ensure admin user exists in the database
   useEffect(() => {
     const setupAdmin = async () => {
+      setIsLoading(true);
       try {
-        await fetch('/api/demo/create-admin-user', {
+        const response = await fetch('/api/demo/create-admin-user', {
           method: 'POST',
         });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Error setting up admin account:', errorData);
+          toast({
+            variant: "destructive",
+            title: "Setup Error",
+            description: "There was an error setting up the admin account. Please try again.",
+          });
+        }
       } catch (error) {
         console.error('Error setting up admin account:', error);
+        toast({
+          variant: "destructive",
+          title: "Connection Error",
+          description: "Could not connect to the server. Please check your connection and try again.",
+        });
+      } finally {
+        setIsLoading(false);
       }
     };
     
     setupAdmin();
-  }, []);
+  }, [toast]);
 
   const handleLogin = async (e: any) => {
     e.preventDefault();
