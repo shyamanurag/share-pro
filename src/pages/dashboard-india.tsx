@@ -727,7 +727,7 @@ export default function Dashboard() {
                                     <div className="mt-4 flex justify-between">
                                       <Button 
                                         size="sm"
-                                        className="w-[48%] bg-blue-600 hover:bg-blue-700 text-white"
+                                        className="w-[48%] bg-green-500 hover:bg-green-600 text-white"
                                         onClick={() => toast({
                                           title: "Coming Soon",
                                           description: "Futures trading will be available soon!",
@@ -737,7 +737,7 @@ export default function Dashboard() {
                                       </Button>
                                       <Button 
                                         size="sm"
-                                        className="w-[48%] bg-indigo-600 hover:bg-indigo-700 text-white"
+                                        className="w-[48%] bg-red-500 hover:bg-red-600 text-white"
                                         onClick={() => toast({
                                           title: "Coming Soon",
                                           description: "Futures trading will be available soon!",
@@ -755,133 +755,249 @@ export default function Dashboard() {
                       </TabsContent>
                       
                       <TabsContent value="options" className="mt-4">
-                        <div className="mb-4 flex justify-between items-center">
-                          <div className="flex space-x-2">
-                            <Button variant="outline" size="sm" className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800 dark:hover:bg-purple-900/40">
-                              Call Options
-                            </Button>
-                            <Button variant="outline" size="sm" className="bg-transparent text-muted-foreground">
-                              Put Options
-                            </Button>
+                        <Tabs defaultValue="call" className="mb-4">
+                          <div className="flex justify-between items-center mb-2">
+                            <TabsList className="grid grid-cols-2 w-48">
+                              <TabsTrigger value="call">Call Options</TabsTrigger>
+                              <TabsTrigger value="put">Put Options</TabsTrigger>
+                            </TabsList>
+                            <div className="text-sm text-muted-foreground">
+                              Expiry: June 27, 2024
+                            </div>
                           </div>
-                          <div className="text-sm text-muted-foreground">
-                            Expiry: June 27, 2024
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-4">
-                          {filteredStocks.slice(0, 5).map(stock => {
-                            const strikePrice = Math.round(stock.currentPrice / 100) * 100;
-                            const premiumPrice = stock.currentPrice * 0.05;
-                            const lotSize = stock.currentPrice > 1000 ? 25 : 50;
-                            const iv = 15 + Math.random() * 10;
-                            const delta = 0.5 + Math.random() * 0.3;
-                            const theta = -(Math.random() * 2).toFixed(2);
-                            
-                            return (
-                              <motion.div
-                                key={`option-${stock.id}`}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.3 }}
-                              >
-                                <Card className="overflow-hidden border-purple-500/20 hover:border-purple-500/70 transition-colors shadow-sm">
-                                  <CardHeader className="p-4 pb-2 bg-gradient-to-r from-purple-500/5 to-pink-500/5">
-                                    <div className="flex justify-between items-start">
-                                      <div>
-                                        <div className="flex items-center space-x-2">
-                                          <h3 className="font-bold text-purple-700 dark:text-purple-400">{stock.symbol} {strikePrice} CE</h3>
-                                          <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
-                                            27 JUN
-                                          </Badge>
+                          
+                          <TabsContent value="call">
+                            <div className="space-y-4">
+                              {filteredStocks.slice(0, 5).map(stock => {
+                                const strikePrice = Math.round(stock.currentPrice / 100) * 100;
+                                const premiumPrice = stock.currentPrice * 0.05;
+                                const lotSize = stock.currentPrice > 1000 ? 25 : 50;
+                                const iv = 15 + Math.random() * 10;
+                                const delta = 0.5 + Math.random() * 0.3;
+                                const theta = -(Math.random() * 2).toFixed(2);
+                                
+                                return (
+                                  <motion.div
+                                    key={`option-${stock.id}`}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.3 }}
+                                  >
+                                    <Card className="overflow-hidden border-purple-500/20 hover:border-purple-500/70 transition-colors shadow-sm">
+                                      <CardHeader className="p-4 pb-2 bg-gradient-to-r from-purple-500/5 to-pink-500/5">
+                                        <div className="flex justify-between items-start">
+                                          <div>
+                                            <div className="flex items-center space-x-2">
+                                              <h3 className="font-bold text-purple-700 dark:text-purple-400">{stock.symbol} {strikePrice} CE</h3>
+                                              <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
+                                                27 JUN
+                                              </Badge>
+                                            </div>
+                                            <p className="text-sm text-muted-foreground">Call Option • Lot: {lotSize}</p>
+                                          </div>
+                                          <div className="text-right">
+                                            <p className="font-bold flex items-center justify-end text-lg">
+                                              <IndianRupee className="w-4 h-4 mr-0.5" />
+                                              {premiumPrice.toFixed(2)}
+                                            </p>
+                                            <div className={`flex items-center justify-end text-sm ${stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                              {stock.change >= 0 ? (
+                                                <TrendingUp className="w-3 h-3 mr-1" />
+                                              ) : (
+                                                <TrendingDown className="w-3 h-3 mr-1" />
+                                              )}
+                                              <span>{stock.change >= 0 ? '+' : ''}{(stock.change * 0.2).toFixed(2)} ({stock.change >= 0 ? '+' : ''}{(stock.changePercent * 2).toFixed(2)}%)</span>
+                                            </div>
+                                          </div>
                                         </div>
-                                        <p className="text-sm text-muted-foreground">Call Option • Lot: {lotSize}</p>
-                                      </div>
-                                      <div className="text-right">
-                                        <p className="font-bold flex items-center justify-end text-lg">
-                                          <IndianRupee className="w-4 h-4 mr-0.5" />
-                                          {premiumPrice.toFixed(2)}
-                                        </p>
-                                        <div className={`flex items-center justify-end text-sm ${stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                          {stock.change >= 0 ? (
-                                            <TrendingUp className="w-3 h-3 mr-1" />
-                                          ) : (
-                                            <TrendingDown className="w-3 h-3 mr-1" />
-                                          )}
-                                          <span>{stock.change >= 0 ? '+' : ''}{(stock.change * 0.2).toFixed(2)} ({stock.change >= 0 ? '+' : ''}{(stock.changePercent * 2).toFixed(2)}%)</span>
+                                      </CardHeader>
+                                      
+                                      <CardContent className="p-4 pt-2">
+                                        <div className="grid grid-cols-3 gap-2 mt-2">
+                                          <div className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded-md">
+                                            <p className="text-xs text-muted-foreground">Strike</p>
+                                            <p className="font-semibold flex items-center">
+                                              <IndianRupee className="w-3 h-3 mr-0.5" />
+                                              {strikePrice}
+                                            </p>
+                                          </div>
+                                          <div className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded-md">
+                                            <p className="text-xs text-muted-foreground">Spot</p>
+                                            <p className="font-semibold flex items-center">
+                                              <IndianRupee className="w-3 h-3 mr-0.5" />
+                                              {stock.currentPrice.toFixed(2)}
+                                            </p>
+                                          </div>
+                                          <div className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded-md">
+                                            <p className="text-xs text-muted-foreground">IV</p>
+                                            <p className="font-semibold">{iv.toFixed(2)}%</p>
+                                          </div>
                                         </div>
-                                      </div>
-                                    </div>
-                                  </CardHeader>
-                                  
-                                  <CardContent className="p-4 pt-2">
-                                    <div className="grid grid-cols-3 gap-2 mt-2">
-                                      <div className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded-md">
-                                        <p className="text-xs text-muted-foreground">Strike</p>
-                                        <p className="font-semibold flex items-center">
-                                          <IndianRupee className="w-3 h-3 mr-0.5" />
-                                          {strikePrice}
-                                        </p>
-                                      </div>
-                                      <div className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded-md">
-                                        <p className="text-xs text-muted-foreground">Spot</p>
-                                        <p className="font-semibold flex items-center">
-                                          <IndianRupee className="w-3 h-3 mr-0.5" />
-                                          {stock.currentPrice.toFixed(2)}
-                                        </p>
-                                      </div>
-                                      <div className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded-md">
-                                        <p className="text-xs text-muted-foreground">IV</p>
-                                        <p className="font-semibold">{iv.toFixed(2)}%</p>
-                                      </div>
-                                    </div>
-                                    
-                                    <div className="grid grid-cols-3 gap-2 mt-2">
-                                      <div className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded-md">
-                                        <p className="text-xs text-muted-foreground">Delta</p>
-                                        <p className="font-semibold">{delta.toFixed(2)}</p>
-                                      </div>
-                                      <div className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded-md">
-                                        <p className="text-xs text-muted-foreground">Theta</p>
-                                        <p className="font-semibold">{theta}</p>
-                                      </div>
-                                      <div className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded-md">
-                                        <p className="text-xs text-muted-foreground">Total Value</p>
-                                        <p className="font-semibold flex items-center">
-                                          <IndianRupee className="w-3 h-3 mr-0.5" />
-                                          {(premiumPrice * lotSize).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                                        </p>
-                                      </div>
-                                    </div>
-                                    
-                                    <div className="mt-4 flex justify-between">
-                                      <Button 
-                                        size="sm"
-                                        className="w-[48%] bg-purple-600 hover:bg-purple-700 text-white"
-                                        onClick={() => toast({
-                                          title: "Coming Soon",
-                                          description: "Options trading will be available soon!",
-                                        })}
-                                      >
-                                        <ShoppingCart className="w-3 h-3 mr-1" /> Buy
-                                      </Button>
-                                      <Button 
-                                        size="sm"
-                                        className="w-[48%] bg-pink-600 hover:bg-pink-700 text-white"
-                                        onClick={() => toast({
-                                          title: "Coming Soon",
-                                          description: "Options trading will be available soon!",
-                                        })}
-                                      >
-                                        <ArrowUpRight className="w-3 h-3 mr-1" /> Sell
-                                      </Button>
-                                    </div>
-                                  </CardContent>
-                                </Card>
-                              </motion.div>
-                            );
-                          })}
-                        </div>
+                                        
+                                        <div className="grid grid-cols-3 gap-2 mt-2">
+                                          <div className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded-md">
+                                            <p className="text-xs text-muted-foreground">Delta</p>
+                                            <p className="font-semibold">{delta.toFixed(2)}</p>
+                                          </div>
+                                          <div className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded-md">
+                                            <p className="text-xs text-muted-foreground">Theta</p>
+                                            <p className="font-semibold">{theta}</p>
+                                          </div>
+                                          <div className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded-md">
+                                            <p className="text-xs text-muted-foreground">Total Value</p>
+                                            <p className="font-semibold flex items-center">
+                                              <IndianRupee className="w-3 h-3 mr-0.5" />
+                                              {(premiumPrice * lotSize).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                            </p>
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="mt-4 flex justify-between">
+                                          <Button 
+                                            size="sm"
+                                            className="w-[48%] bg-green-500 hover:bg-green-600 text-white"
+                                            onClick={() => toast({
+                                              title: "Coming Soon",
+                                              description: "Options trading will be available soon!",
+                                            })}
+                                          >
+                                            <ShoppingCart className="w-3 h-3 mr-1" /> Buy
+                                          </Button>
+                                          <Button 
+                                            size="sm"
+                                            className="w-[48%] bg-red-500 hover:bg-red-600 text-white"
+                                            onClick={() => toast({
+                                              title: "Coming Soon",
+                                              description: "Options trading will be available soon!",
+                                            })}
+                                          >
+                                            <ArrowUpRight className="w-3 h-3 mr-1" /> Sell
+                                          </Button>
+                                        </div>
+                                      </CardContent>
+                                    </Card>
+                                  </motion.div>
+                                );
+                              })}
+                            </div>
+                          </TabsContent>
+                          
+                          <TabsContent value="put">
+                            <div className="space-y-4">
+                              {filteredStocks.slice(0, 5).map(stock => {
+                                const strikePrice = Math.round(stock.currentPrice / 100) * 100;
+                                const premiumPrice = stock.currentPrice * 0.03;
+                                const lotSize = stock.currentPrice > 1000 ? 25 : 50;
+                                const iv = 15 + Math.random() * 10;
+                                const delta = -(0.5 + Math.random() * 0.3);
+                                const theta = -(Math.random() * 2).toFixed(2);
+                                
+                                return (
+                                  <motion.div
+                                    key={`put-option-${stock.id}`}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.3 }}
+                                  >
+                                    <Card className="overflow-hidden border-orange-500/20 hover:border-orange-500/70 transition-colors shadow-sm">
+                                      <CardHeader className="p-4 pb-2 bg-gradient-to-r from-orange-500/5 to-red-500/5">
+                                        <div className="flex justify-between items-start">
+                                          <div>
+                                            <div className="flex items-center space-x-2">
+                                              <h3 className="font-bold text-orange-700 dark:text-orange-400">{stock.symbol} {strikePrice} PE</h3>
+                                              <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300">
+                                                27 JUN
+                                              </Badge>
+                                            </div>
+                                            <p className="text-sm text-muted-foreground">Put Option • Lot: {lotSize}</p>
+                                          </div>
+                                          <div className="text-right">
+                                            <p className="font-bold flex items-center justify-end text-lg">
+                                              <IndianRupee className="w-4 h-4 mr-0.5" />
+                                              {premiumPrice.toFixed(2)}
+                                            </p>
+                                            <div className={`flex items-center justify-end text-sm ${stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                              {stock.change >= 0 ? (
+                                                <TrendingUp className="w-3 h-3 mr-1" />
+                                              ) : (
+                                                <TrendingDown className="w-3 h-3 mr-1" />
+                                              )}
+                                              <span>{stock.change >= 0 ? '+' : ''}{(stock.change * 0.2).toFixed(2)} ({stock.change >= 0 ? '+' : ''}{(stock.changePercent * 2).toFixed(2)}%)</span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </CardHeader>
+                                      
+                                      <CardContent className="p-4 pt-2">
+                                        <div className="grid grid-cols-3 gap-2 mt-2">
+                                          <div className="bg-orange-50 dark:bg-orange-950/30 p-2 rounded-md">
+                                            <p className="text-xs text-muted-foreground">Strike</p>
+                                            <p className="font-semibold flex items-center">
+                                              <IndianRupee className="w-3 h-3 mr-0.5" />
+                                              {strikePrice}
+                                            </p>
+                                          </div>
+                                          <div className="bg-orange-50 dark:bg-orange-950/30 p-2 rounded-md">
+                                            <p className="text-xs text-muted-foreground">Spot</p>
+                                            <p className="font-semibold flex items-center">
+                                              <IndianRupee className="w-3 h-3 mr-0.5" />
+                                              {stock.currentPrice.toFixed(2)}
+                                            </p>
+                                          </div>
+                                          <div className="bg-orange-50 dark:bg-orange-950/30 p-2 rounded-md">
+                                            <p className="text-xs text-muted-foreground">IV</p>
+                                            <p className="font-semibold">{iv.toFixed(2)}%</p>
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-3 gap-2 mt-2">
+                                          <div className="bg-orange-50 dark:bg-orange-950/30 p-2 rounded-md">
+                                            <p className="text-xs text-muted-foreground">Delta</p>
+                                            <p className="font-semibold">{delta.toFixed(2)}</p>
+                                          </div>
+                                          <div className="bg-orange-50 dark:bg-orange-950/30 p-2 rounded-md">
+                                            <p className="text-xs text-muted-foreground">Theta</p>
+                                            <p className="font-semibold">{theta}</p>
+                                          </div>
+                                          <div className="bg-orange-50 dark:bg-orange-950/30 p-2 rounded-md">
+                                            <p className="text-xs text-muted-foreground">Total Value</p>
+                                            <p className="font-semibold flex items-center">
+                                              <IndianRupee className="w-3 h-3 mr-0.5" />
+                                              {(premiumPrice * lotSize).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                            </p>
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="mt-4 flex justify-between">
+                                          <Button 
+                                            size="sm"
+                                            className="w-[48%] bg-green-500 hover:bg-green-600 text-white"
+                                            onClick={() => toast({
+                                              title: "Coming Soon",
+                                              description: "Options trading will be available soon!",
+                                            })}
+                                          >
+                                            <ShoppingCart className="w-3 h-3 mr-1" /> Buy
+                                          </Button>
+                                          <Button 
+                                            size="sm"
+                                            className="w-[48%] bg-red-500 hover:bg-red-600 text-white"
+                                            onClick={() => toast({
+                                              title: "Coming Soon",
+                                              description: "Options trading will be available soon!",
+                                            })}
+                                          >
+                                            <ArrowUpRight className="w-3 h-3 mr-1" /> Sell
+                                          </Button>
+                                        </div>
+                                      </CardContent>
+                                    </Card>
+                                  </motion.div>
+                                );
+                              })}
+                            </div>
+                          </TabsContent>
+                        </Tabs>
                       </TabsContent>
                     </Tabs>
                   </div>
