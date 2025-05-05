@@ -30,7 +30,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   User,
-  Info
+  Info,
+  Zap
 } from "lucide-react";
 import prisma from "@/lib/prisma";
 
@@ -384,6 +385,15 @@ export default function Dashboard() {
             </div>
             
             <div className="flex items-center space-x-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push('/advanced-trading')}
+                className="flex items-center gap-1"
+              >
+                <Zap className="w-4 h-4" />
+                Advanced Trading
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
