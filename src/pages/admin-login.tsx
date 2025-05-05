@@ -29,14 +29,17 @@ const AdminLoginPage = () => {
           method: 'POST',
         });
         
+        const data = await response.json();
+        
         if (!response.ok) {
-          const errorData = await response.json();
-          console.error('Error setting up admin account:', errorData);
+          console.error('Error setting up admin account:', data);
           toast({
             variant: "destructive",
             title: "Setup Error",
-            description: "There was an error setting up the admin account. Please try again.",
+            description: data.error || "There was an error setting up the admin account. Please try again.",
           });
+        } else {
+          console.log('Admin account setup successful');
         }
       } catch (error) {
         console.error('Error setting up admin account:', error);
@@ -58,14 +61,29 @@ const AdminLoginPage = () => {
     setIsLoading(true);
     try {
       const { email, password } = formik.values;
+      
+      // First ensure the admin user exists
+      const setupResponse = await fetch('/api/demo/create-admin-user', {
+        method: 'POST',
+      });
+      
+      if (!setupResponse.ok) {
+        const errorData = await setupResponse.json();
+        console.error('Error setting up admin account before login:', errorData);
+        throw new Error(errorData.error || 'Failed to setup admin account');
+      }
+      
+      // Then attempt to sign in
       await signIn(email, password);
       router.push('/admin');
     } catch (error) {
-      console.error(error);
+      console.error('Login error:', error);
       toast({
         variant: "destructive",
         title: "Login failed",
-        description: "Please check your credentials and try again.",
+        description: error instanceof Error 
+          ? error.message 
+          : "Please check your credentials and try again.",
       });
     } finally {
       setIsLoading(false);

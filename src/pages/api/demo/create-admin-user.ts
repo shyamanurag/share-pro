@@ -12,14 +12,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const adminEmail = 'admin@tradepaper.com';
     const adminPassword = 'demo1234';
     
-    // First check if admin user exists in Supabase Auth
-    const { data: { users }, error: getUserError } = await supabase.auth.admin.listUsers();
+    // Try to sign in with admin credentials first
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email: adminEmail,
+      password: adminPassword,
+    });
     
-    let adminUser = users?.find(user => user.email === adminEmail);
+    let adminUser = signInData?.user;
     
-    if (!adminUser) {
-      // Admin doesn't exist in Supabase Auth, try to create
-      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+    // If sign in fails, try to create the admin user
+    if (signInError || !adminUser) {
+      console.log('Admin sign in failed, attempting to create admin user');
+      
+      // Try to create the admin user
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: adminEmail,
         password: adminPassword,
         options: {
@@ -27,52 +33,77 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       });
       
-      if (signUpError && signUpError.message !== 'User already registered') {
-        console.error('Error creating admin user in Supabase Auth:', signUpError);
-        return res.status(500).json({ error: 'Failed to create admin user' });
+      // If sign up fails with "User already registered" but sign in also failed,
+      // there might be an issue with the password
+      if (signUpError && signUpError.message === 'User already registered') {
+        console.log('Admin user exists but sign in failed. Attempting admin password reset');
+        
+        // For demo purposes, we'll try to update the user's password directly
+        // In a real app, you'd use a proper password reset flow
+        try {
+          // This is a workaround for demo purposes only
+          const { error: updateError } = await supabase.auth.admin.updateUserById(
+            signUpData?.user?.id || 'unknown',
+            { password: adminPassword }
+          );
+          
+          if (updateError) {
+            console.error('Failed to update admin password:', updateError);
+          } else {
+            // Try signing in again after password update
+            const { data: retryData } = await supabase.auth.signInWithPassword({
+              email: adminEmail,
+              password: adminPassword,
+            });
+            
+            adminUser = retryData?.user;
+          }
+        } catch (updateError) {
+          console.error('Error updating admin password:', updateError);
+        }
+      } else if (!signUpError) {
+        // Sign up succeeded
+        adminUser = signUpData?.user;
       }
-      
-      adminUser = authData.user;
     }
     
-    // If we still don't have an admin user, try to sign in to get the user
-    if (!adminUser) {
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: adminEmail,
-        password: adminPassword,
-      });
-      
-      if (signInError) {
-        console.error('Error signing in as admin:', signInError);
-        return res.status(500).json({ error: 'Failed to authenticate admin user' });
-      }
-      
-      adminUser = signInData.user;
-    }
-    
-    // Now ensure the admin user exists in our database with the correct role
+    // If we have an admin user, ensure they exist in our database with the correct role
     if (adminUser) {
-      await prisma.user.upsert({
-        where: { id: adminUser.id },
-        update: {
-          name: 'Admin User',
-          balance: 1000000,
-          role: 'ADMIN',
-          isActive: true,
-          lastLogin: new Date(),
-        },
-        create: {
-          id: adminUser.id,
-          email: adminUser.email!,
-          name: 'Admin User',
-          balance: 1000000,
-          role: 'ADMIN',
-          isActive: true,
-          lastLogin: new Date(),
-        },
-      });
+      try {
+        await prisma.user.upsert({
+          where: { id: adminUser.id },
+          update: {
+            name: 'Admin User',
+            balance: 1000000,
+            role: 'ADMIN',
+            isActive: true,
+            lastLogin: new Date(),
+          },
+          create: {
+            id: adminUser.id,
+            email: adminUser.email!,
+            name: 'Admin User',
+            balance: 1000000,
+            role: 'ADMIN',
+            isActive: true,
+            lastLogin: new Date(),
+          },
+        });
+        
+        console.log('Admin user created/updated in database successfully');
+      } catch (prismaError) {
+        console.error('Error upserting admin user in database:', prismaError);
+        return res.status(500).json({ 
+          error: 'Failed to create admin user in database',
+          details: prismaError instanceof Error ? prismaError.message : 'Unknown error'
+        });
+      }
     } else {
-      return res.status(500).json({ error: 'Failed to create or retrieve admin user' });
+      console.error('Failed to create or retrieve admin user from Supabase Auth');
+      return res.status(500).json({ 
+        error: 'Failed to create or retrieve admin user',
+        signInError: signInError ? signInError.message : null
+      });
     }
 
     return res.status(200).json({ success: true });
