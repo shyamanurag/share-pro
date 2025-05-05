@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tradepaper-india-v1';
+const CACHE_NAME = 'tradepaper-india-v2';
 const urlsToCache = [
   '/',
   '/dashboard',
@@ -21,12 +21,17 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Skip caching for admin-related URLs, auth endpoints, and API requests
+  // Skip caching for admin-related URLs, auth endpoints, API requests, and login-related pages
   if (
     event.request.url.includes('/admin') ||
     event.request.url.includes('/api/') ||
     event.request.url.includes('/auth/') ||
-    event.request.url.includes('admin-login')
+    event.request.url.includes('admin-login') ||
+    event.request.url.includes('/login') ||
+    event.request.url.includes('/signup') ||
+    event.request.url.includes('/magic-link-login') ||
+    event.request.url.includes('/reset-password') ||
+    event.request.url.includes('/forgot-password')
   ) {
     return event.respondWith(fetch(event.request));
   }

@@ -1,15 +1,20 @@
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
-    // Check if we're on an admin page
-    const isAdminPage = window.location.pathname.includes('/admin') || 
-                        window.location.pathname.includes('/admin-login');
+    // Check if we're on an admin page or authentication-related page
+    const isAdminOrAuthPage = window.location.pathname.includes('/admin') || 
+                             window.location.pathname.includes('/admin-login') ||
+                             window.location.pathname.includes('/login') ||
+                             window.location.pathname.includes('/signup') ||
+                             window.location.pathname.includes('/magic-link-login') ||
+                             window.location.pathname.includes('/reset-password') ||
+                             window.location.pathname.includes('/forgot-password');
     
-    if (isAdminPage) {
+    if (isAdminOrAuthPage) {
       // For admin pages, unregister any existing service workers to prevent caching issues
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
         for(let registration of registrations) {
           registration.unregister();
-          console.log('ServiceWorker unregistered for admin page');
+          console.log('ServiceWorker unregistered for admin/auth page');
         }
       });
     } else {

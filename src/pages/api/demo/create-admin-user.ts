@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@/util/supabase/api';
 import prisma from '@/lib/prisma';
+import { randomUUID } from 'crypto';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -23,33 +24,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     console.log('Existing admin in database:', existingDbUser ? 'Found' : 'Not found');
     
-    // Try to sign in with admin credentials first
-    console.log('Attempting to sign in admin user');
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email: adminEmail,
-      password: adminPassword,
-    });
+    // First, try to get the user by email from Supabase
+    console.log('Checking if admin user exists in Supabase');
+    const { data: { users }, error: getUserError } = await supabase.auth.admin.listUsers();
     
-    if (signInError) {
-      console.log('Admin sign in failed:', signInError.message);
-    } else {
-      console.log('Admin sign in successful');
+    if (getUserError) {
+      console.error('Error listing users:', getUserError);
+      return res.status(500).json({ error: 'Failed to check if admin user exists' });
     }
     
-    let adminUser = signInData?.user;
-    let adminId = adminUser?.id;
+    const existingUser = users?.find(u => u.email === adminEmail);
+    let adminUser = existingUser;
+    let adminId = existingUser?.id;
     
-    // If sign in fails, try to create the admin user
-    if (signInError || !adminUser) {
+    // If user doesn't exist in Supabase, create them
+    if (!existingUser) {
       console.log('Attempting to create admin user');
       
-      // Try to create the admin user
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      // Try to create the admin user with admin API to bypass email confirmation
+      const { data: signUpData, error: signUpError } = await supabase.auth.admin.createUser({
         email: adminEmail,
         password: adminPassword,
-        options: {
-          emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/admin`,
-        }
+        user_metadata: {
+          full_name: 'Admin User',
+          role: 'ADMIN'
+        },
+        email_confirm: true
       });
       
       if (signUpError) {
@@ -131,6 +131,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
         
         console.log('Admin user created/updated in database successfully:', upsertedUser.id);
+        
+        // If this is a new user, create default portfolio and watchlist
+        if (!existingDbUser) {
+          try {
+            // Create default portfolio
+            await prisma.portfolio.create({
+              data: {
+                id: randomUUID(),
+                name: 'Default Portfolio',
+                userId: adminId,
+              }
+            });
+            
+            // Create default watchlist
+            await prisma.watchlist.create({
+              data: {
+                id: randomUUID(),
+                name: 'Default Watchlist',
+                userId: adminId,
+              }
+            });
+            
+            console.log('Created default portfolio and watchlist for admin user');
+          } catch (err) {
+            console.error('Error creating default portfolio/watchlist:', err);
+            // Continue anyway as the user was created
+          }
+        }
         
         return res.status(200).json({ 
           success: true, 

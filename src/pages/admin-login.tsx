@@ -1,5 +1,5 @@
 import { useFormik } from 'formik';
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useContext, useState, useEffect, useCallback } from 'react';
 import * as Yup from 'yup';
 import { useRouter } from 'next/navigation';
 import { AuthContext } from '@/contexts/AuthContext';
@@ -19,6 +19,47 @@ const AdminLoginPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { isIframe } = useIsIFrame();
   const { toast } = useToast();
+  const [isClearingCache, setIsClearingCache] = useState(false);
+
+  // Function to clear cache and service workers
+  const clearCacheAndServiceWorkers = useCallback(async () => {
+    setIsClearingCache(true);
+    try {
+      // Clear localStorage
+      localStorage.clear();
+      
+      // Clear sessionStorage
+      sessionStorage.clear();
+      
+      // Unregister service workers
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const registration of registrations) {
+          await registration.unregister();
+        }
+      }
+      
+      // Clear caches
+      if ('caches' in window) {
+        const cacheKeys = await caches.keys();
+        await Promise.all(cacheKeys.map(key => caches.delete(key)));
+      }
+      
+      toast({
+        title: "Cache Cleared",
+        description: "Browser cache has been cleared. Please try logging in again.",
+      });
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to clear cache. Please try refreshing the page.",
+      });
+    } finally {
+      setIsClearingCache(false);
+    }
+  }, [toast]);
 
   // Clear any existing auth state on component mount
   useEffect(() => {
@@ -232,6 +273,18 @@ const AdminLoginPage = () => {
                 >
                   {isLoading ? "Logging in..." : "Login as Admin"}
                 </Button>
+                
+                <div className="mt-4 text-center">
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="text-xs text-muted-foreground"
+                    onClick={clearCacheAndServiceWorkers}
+                    disabled={isClearingCache}
+                  >
+                    {isClearingCache ? "Clearing cache..." : "Having trouble? Clear browser cache"}
+                  </Button>
+                </div>
                 <Button
                   type="button"
                   variant="outline"
