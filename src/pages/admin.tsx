@@ -2864,10 +2864,45 @@ export default function AdminDashboard() {
               <>
                 <div className="flex justify-between items-center mb-6">
                   <h1 className="text-2xl font-bold">Stock Management</h1>
-                  <Button variant="outline" size="sm" className="flex items-center gap-1">
-                    <RefreshCw className="w-4 h-4" />
-                    Refresh
-                  </Button>
+                  <div className="flex space-x-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex items-center gap-1"
+                      onClick={() => {
+                        setIsLoading(true);
+                        fetch('/api/stocks/replace-with-indian', {
+                          method: 'POST',
+                        })
+                          .then(response => response.json())
+                          .then(data => {
+                            setStocks(data.stocks);
+                            toast({
+                              title: "Stocks Replaced",
+                              description: "All stocks have been replaced with Indian NSE stocks.",
+                            });
+                          })
+                          .catch(error => {
+                            console.error('Error replacing stocks:', error);
+                            toast({
+                              variant: "destructive",
+                              title: "Error",
+                              description: "Failed to replace stocks with Indian stocks.",
+                            });
+                          })
+                          .finally(() => {
+                            setIsLoading(false);
+                          });
+                      }}
+                    >
+                      <IndianRupee className="w-4 h-4 mr-1" />
+                      Replace with Indian Stocks
+                    </Button>
+                    <Button variant="outline" size="sm" className="flex items-center gap-1">
+                      <RefreshCw className="w-4 h-4" />
+                      Refresh
+                    </Button>
+                  </div>
                 </div>
                 
                 <div className="relative mb-6">
