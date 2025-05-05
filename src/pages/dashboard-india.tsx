@@ -1241,72 +1241,223 @@ export default function Dashboard() {
                 <h2 className="text-xl font-bold">My Profile</h2>
               </div>
               
-              <Card className="mb-6">
-                <CardContent className="p-6">
-                  <div className="flex flex-col items-center mb-6">
-                    <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4">
-                      {userProfile?.avatarUrl ? (
-                        <img 
-                          src={userProfile.avatarUrl} 
-                          alt="Profile" 
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      ) : (
-                        <User className="w-10 h-10 text-muted-foreground" />
-                      )}
-                    </div>
-                    <h3 className="text-xl font-bold">{userProfile?.name || userProfile?.email}</h3>
-                    <p className="text-sm text-muted-foreground">{userProfile?.email}</p>
-                  </div>
+              <Tabs defaultValue="profile" className="mb-6">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="profile">Profile</TabsTrigger>
+                  <TabsTrigger value="add-money">Add Money</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="profile" className="mt-4">
+                  <Card className="mb-6">
+                    <CardContent className="p-6">
+                      <div className="flex flex-col items-center mb-6">
+                        <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4">
+                          {userProfile?.avatarUrl ? (
+                            <img 
+                              src={userProfile.avatarUrl} 
+                              alt="Profile" 
+                              className="w-full h-full rounded-full object-cover"
+                            />
+                          ) : (
+                            <User className="w-10 h-10 text-muted-foreground" />
+                          )}
+                        </div>
+                        <h3 className="text-xl font-bold">{userProfile?.name || userProfile?.email}</h3>
+                        <p className="text-sm text-muted-foreground">{userProfile?.email}</p>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 mb-6">
+                        <Card>
+                          <CardContent className="p-4 text-center">
+                            <p className="text-sm text-muted-foreground">Balance</p>
+                            <p className="text-xl font-bold flex items-center justify-center">
+                              <IndianRupee className="w-4 h-4 mr-1" />
+                              {userProfile?.balance?.toFixed(2) || "0.00"}
+                            </p>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardContent className="p-4 text-center">
+                            <p className="text-sm text-muted-foreground">Portfolio Value</p>
+                            <p className="text-xl font-bold flex items-center justify-center">
+                              <IndianRupee className="w-4 h-4 mr-1" />
+                              {portfolioValue.toFixed(2)}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <p className="text-sm font-medium">Total Value</p>
+                          <p className="text-lg font-bold flex items-center">
+                            <IndianRupee className="w-4 h-4 mr-1" />
+                            {((userProfile?.balance || 0) + portfolioValue).toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <p className="text-sm font-medium">Transactions</p>
+                          <p className="text-lg font-bold">{transactions.length}</p>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <p className="text-sm font-medium">Joined</p>
+                          <p className="text-sm">{userProfile ? new Date(userProfile.createdAt).toLocaleDateString() : ""}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                   
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    <Card>
-                      <CardContent className="p-4 text-center">
-                        <p className="text-sm text-muted-foreground">Balance</p>
-                        <p className="text-xl font-bold flex items-center justify-center">
-                          <IndianRupee className="w-4 h-4 mr-1" />
-                          {userProfile?.balance?.toFixed(2) || "0.00"}
-                        </p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="p-4 text-center">
-                        <p className="text-sm text-muted-foreground">Portfolio Value</p>
-                        <p className="text-xl font-bold flex items-center justify-center">
-                          <IndianRupee className="w-4 h-4 mr-1" />
-                          {portfolioValue.toFixed(2)}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <p className="text-sm font-medium">Total Value</p>
-                      <p className="text-lg font-bold flex items-center">
-                        <IndianRupee className="w-4 h-4 mr-1" />
-                        {((userProfile?.balance || 0) + portfolioValue).toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <p className="text-sm font-medium">Transactions</p>
-                      <p className="text-lg font-bold">{transactions.length}</p>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <p className="text-sm font-medium">Joined</p>
-                      <p className="text-sm">{userProfile ? new Date(userProfile.createdAt).toLocaleDateString() : ""}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Button 
-                variant="destructive" 
-                className="w-full"
-                onClick={signOut}
-              >
-                Sign Out
-              </Button>
+                  <Button 
+                    variant="destructive" 
+                    className="w-full"
+                    onClick={signOut}
+                  >
+                    Sign Out
+                  </Button>
+                </TabsContent>
+                
+                <TabsContent value="add-money" className="mt-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Add Money to Your Account</CardTitle>
+                      <CardDescription>
+                        Add funds to your trading account using UPI or Card payment
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <form className="space-y-4" onSubmit={(e) => {
+                        e.preventDefault();
+                        const formData = new FormData(e.currentTarget);
+                        const amount = formData.get('amount') as string;
+                        const paymentMethod = formData.get('paymentMethod') as string;
+                        
+                        if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+                          toast({
+                            variant: "destructive",
+                            title: "Invalid amount",
+                            description: "Please enter a valid amount greater than 0",
+                          });
+                          return;
+                        }
+                        
+                        setIsLoading(true);
+                        
+                        fetch('/api/user/add-money', {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({
+                            amount: parseFloat(amount),
+                            paymentMethod,
+                          }),
+                        })
+                          .then(response => response.json())
+                          .then(data => {
+                            if (data.error) {
+                              throw new Error(data.error);
+                            }
+                            
+                            // Update user profile with new balance
+                            setUserProfile(data.user);
+                            
+                            toast({
+                              title: "Money Added Successfully",
+                              description: data.message,
+                            });
+                            
+                            // Reset form
+                            e.currentTarget.reset();
+                          })
+                          .catch(error => {
+                            console.error('Error adding money:', error);
+                            toast({
+                              variant: "destructive",
+                              title: "Failed to add money",
+                              description: error.message || "An error occurred while adding money",
+                            });
+                          })
+                          .finally(() => {
+                            setIsLoading(false);
+                          });
+                      }}>
+                        <div className="space-y-2">
+                          <label htmlFor="amount" className="text-sm font-medium">
+                            Amount (₹)
+                          </label>
+                          <Input
+                            id="amount"
+                            name="amount"
+                            type="number"
+                            placeholder="Enter amount"
+                            min="100"
+                            step="100"
+                            required
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">
+                            Payment Method
+                          </label>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="radio"
+                                id="upi"
+                                name="paymentMethod"
+                                value="UPI"
+                                className="h-4 w-4 border-gray-300 text-green-600 focus:ring-green-500"
+                                defaultChecked
+                              />
+                              <label htmlFor="upi" className="text-sm font-medium">
+                                UPI
+                              </label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="radio"
+                                id="card"
+                                name="paymentMethod"
+                                value="CARD"
+                                className="h-4 w-4 border-gray-300 text-green-600 focus:ring-green-500"
+                              />
+                              <label htmlFor="card" className="text-sm font-medium">
+                                Card
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="pt-4">
+                          <Button
+                            type="submit"
+                            className="w-full bg-green-600 hover:bg-green-700"
+                            disabled={isLoading}
+                          >
+                            {isLoading ? (
+                              <>
+                                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                Processing...
+                              </>
+                            ) : (
+                              <>
+                                <IndianRupee className="mr-2 h-4 w-4" />
+                                Add Money
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                        
+                        <div className="mt-4 text-xs text-muted-foreground">
+                          <p className="mb-1">Note: This is a paper trading app. No real money will be charged.</p>
+                          <p>In a real app, this would redirect to a payment gateway.</p>
+                        </div>
+                      </form>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
             </>
           )}
         </main>
