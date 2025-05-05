@@ -1,7 +1,8 @@
-const CACHE_NAME = 'tradepaper-v1';
+const CACHE_NAME = 'tradepaper-india-v1';
 const urlsToCache = [
   '/',
   '/dashboard',
+  '/dashboard-india',
   '/login',
   '/signup',
   '/manifest.json',

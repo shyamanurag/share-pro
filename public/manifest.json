@@ -1,11 +1,11 @@
 {
-  "name": "TradePaper",
+  "name": "TradePaper India",
   "short_name": "TradePaper",
-  "description": "Paper trading app for practicing stock trading without risk",
-  "start_url": "/",
+  "description": "Paper trading app for practicing Indian stock market trading without risk",
+  "start_url": "/dashboard-india",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#4CAF50",
+  "theme_color": "#FF9933",
   "orientation": "portrait",
   "icons": [
     {
@@ -62,7 +62,7 @@
       "name": "Dashboard",
       "short_name": "Dashboard",
       "description": "View your trading dashboard",
-      "url": "/dashboard",
+      "url": "/dashboard-india",
       "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
     }
   ]

@@ -5,14 +5,14 @@ export default function Document() {
   return (
     <Html lang="en">
       <Head>
-        <meta name="application-name" content="TradePaper" />
+        <meta name="application-name" content="TradePaper India" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="TradePaper" />
-        <meta name="description" content="Paper trading app for practicing stock trading without risk" />
+        <meta name="apple-mobile-web-app-title" content="TradePaper India" />
+        <meta name="description" content="Paper trading app for practicing Indian stock market trading without risk" />
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="theme-color" content="#4CAF50" />
+        <meta name="theme-color" content="#FF9933" />
 
         <link rel="manifest" href="/manifest.json" />
         <link rel="shortcut icon" href="/favicon.ico" />
