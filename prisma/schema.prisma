@@ -26,6 +26,9 @@ model User {
   riskProfile       RiskProfile?
   orderAlerts       OrderAlert[]
   bracketOrders     BracketOrder[]
+  kycDetails        KycDetail?
+  paymentRequests   PaymentRequest[]
+  loginHistory      LoginHistory[]
 }
 
 model Stock {
@@ -232,6 +235,78 @@ model SystemLog {
   message     String
   details     String?  @db.Text
   timestamp   DateTime @default(now())
+}
+
+// KYC Verification Models
+model KycDetail {
+  id              String    @id @default(uuid())
+  userId          String    @unique @db.Uuid
+  user            User      @relation(fields: [userId], references: [id])
+  fullName        String
+  dateOfBirth     DateTime
+  panNumber       String?   // PAN Card for Indian users
+  aadharNumber    String?   // Aadhar number for Indian users
+  address         String
+  city            String
+  state           String
+  postalCode      String
+  country         String    @default("India")
+  documentType    String    // "AADHAR", "PAN", "PASSPORT", "DRIVING_LICENSE"
+  documentFront   String    // URL to document front image
+  documentBack    String?   // URL to document back image (if applicable)
+  selfie          String?   // URL to selfie image
+  status          String    @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
+  rejectionReason String?
+  verifiedBy      String?   // Admin user ID who verified
+  verifiedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// Payment Request Models
+model PaymentRequest {
+  id              String    @id @default(uuid())
+  userId          String    @db.Uuid
+  user            User      @relation(fields: [userId], references: [id])
+  amount          Float
+  paymentMethod   String    // "UPI", "CARD", "NETBANKING", etc.
+  paymentDetails  String?   @db.Text // JSON string with payment details
+  status          String    @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
+  transactionId   String?   // External payment gateway transaction ID
+  rejectionReason String?
+  approvedBy      String?   // Admin user ID who approved
+  approvedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// User Login History
+model LoginHistory {
+  id          String    @id @default(uuid())
+  userId      String    @db.Uuid
+  user        User      @relation(fields: [userId], references: [id])
+  ipAddress   String?
+  userAgent   String?
+  deviceInfo  String?
+  location    String?
+  status      String    // "SUCCESS", "FAILED"
+  timestamp   DateTime  @default(now())
+}
+
+// Risk Management Report
+model RiskReport {
+  id              String    @id @default(uuid())
+  reportDate      DateTime  @default(now())
+  totalUsers      Int
+  activeUsers     Int
+  totalExposure   Float
+  equityExposure  Float
+  fnoExposure     Float
+  marginUtilized  Float
+  riskRatio       Float
+  details         String?   @db.Text // JSON string with detailed breakdown
+  createdBy       String    // Admin user ID who generated the report
+  createdAt       DateTime  @default(now())
 }
 
 model ApiUsage {

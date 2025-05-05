@@ -14,6 +14,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/components/ui/use-toast";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { 
   Users, 
   BarChart3, 
@@ -51,7 +54,21 @@ import {
   Upload,
   Filter,
   MoreHorizontal,
-  Plus
+  Plus,
+  CheckCircle2,
+  XCircle,
+  FileSpreadsheet,
+  FilePdf,
+  FileJson,
+  CreditCard,
+  Wallet,
+  CircleDollarSign,
+  ClipboardCheck,
+  UserCheck,
+  UserX,
+  PieChart,
+  BarChart,
+  Percent
 } from "lucide-react";
 
 // Types
@@ -61,6 +78,84 @@ interface UserProfile {
   name: string | null;
   avatarUrl: string | null;
   balance: number;
+  createdAt: string;
+  role?: string;
+  isActive?: boolean;
+  lastLogin?: string;
+}
+
+interface KycDetail {
+  id: string;
+  userId: string;
+  fullName: string;
+  dateOfBirth: string;
+  panNumber?: string;
+  aadharNumber?: string;
+  address: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  documentType: string;
+  documentFront: string;
+  documentBack?: string;
+  selfie?: string;
+  status: string;
+  rejectionReason?: string;
+  verifiedBy?: string;
+  verifiedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  user: {
+    id: string;
+    email: string;
+    name: string | null;
+  };
+}
+
+interface PaymentRequest {
+  id: string;
+  userId: string;
+  amount: number;
+  paymentMethod: string;
+  paymentDetails?: string;
+  status: string;
+  transactionId?: string;
+  rejectionReason?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  user: {
+    id: string;
+    email: string;
+    name: string | null;
+  };
+}
+
+interface LoginHistory {
+  id: string;
+  userId: string;
+  ipAddress?: string;
+  userAgent?: string;
+  deviceInfo?: string;
+  location?: string;
+  status: string;
+  timestamp: string;
+}
+
+interface RiskReport {
+  id: string;
+  reportDate: string;
+  totalUsers: number;
+  activeUsers: number;
+  totalExposure: number;
+  equityExposure: number;
+  fnoExposure: number;
+  marginUtilized: number;
+  riskRatio: number;
+  details?: string;
+  createdBy: string;
   createdAt: string;
 }
 
@@ -98,21 +193,33 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [kycRequests, setKycRequests] = useState<KycDetail[]>([]);
+  const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
+  const [loginHistory, setLoginHistory] = useState<LoginHistory[]>([]);
+  const [riskReport, setRiskReport] = useState<RiskReport | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [kycFilter, setKycFilter] = useState("PENDING");
+  const [paymentFilter, setPaymentFilter] = useState("PENDING");
+  const [exportFormat, setExportFormat] = useState("csv");
+  const [selectedKyc, setSelectedKyc] = useState<KycDetail | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<PaymentRequest | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalTransactions: 0,
     totalTradingVolume: 0,
-    activeUsers: 0
+    activeUsers: 0,
+    pendingKyc: 2,
+    pendingPayments: 1,
+    totalExposure: 750000
   });
 
-  // Mock data for admin dashboard
+  // Fetch admin dashboard data
   useEffect(() => {
     if (user) {
-      // In a real implementation, these would be API calls to admin endpoints
       setIsLoading(true);
       
-      // Mock users data
+      // Mock users data for demo
       const mockUsers: UserProfile[] = [
         {
           id: "1",
@@ -120,7 +227,10 @@ export default function AdminDashboard() {
           name: "Admin User",
           avatarUrl: null,
           balance: 1000000,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          role: "ADMIN",
+          isActive: true,
+          lastLogin: new Date().toISOString()
         },
         {
           id: "2",
@@ -128,7 +238,10 @@ export default function AdminDashboard() {
           name: "Demo User",
           avatarUrl: null,
           balance: 500000,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          role: "USER",
+          isActive: true,
+          lastLogin: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
         },
         {
           id: "3",
@@ -136,7 +249,21 @@ export default function AdminDashboard() {
           name: "Regular User",
           avatarUrl: null,
           balance: 250000,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          role: "USER",
+          isActive: true,
+          lastLogin: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: "4",
+          email: "inactive@example.com",
+          name: "Inactive User",
+          avatarUrl: null,
+          balance: 100000,
+          createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          role: "USER",
+          isActive: false,
+          lastLogin: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString()
         }
       ];
       
@@ -169,17 +296,239 @@ export default function AdminDashboard() {
             });
           }
           
+          // Generate mock KYC requests
+          const mockKycRequests: KycDetail[] = [
+            {
+              id: "kyc-1",
+              userId: mockUsers[1].id,
+              fullName: "Demo User",
+              dateOfBirth: new Date(1990, 5, 15).toISOString(),
+              panNumber: "ABCDE1234F",
+              aadharNumber: "1234 5678 9012",
+              address: "123 Main Street",
+              city: "Mumbai",
+              state: "Maharashtra",
+              postalCode: "400001",
+              country: "India",
+              documentType: "AADHAR",
+              documentFront: "https://example.com/document-front.jpg",
+              documentBack: "https://example.com/document-back.jpg",
+              selfie: "https://example.com/selfie.jpg",
+              status: "PENDING",
+              createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+              updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+              user: {
+                id: mockUsers[1].id,
+                email: mockUsers[1].email,
+                name: mockUsers[1].name
+              }
+            },
+            {
+              id: "kyc-2",
+              userId: mockUsers[2].id,
+              fullName: "Regular User",
+              dateOfBirth: new Date(1985, 8, 22).toISOString(),
+              panNumber: "PQRST5678G",
+              aadharNumber: "9876 5432 1098",
+              address: "456 Park Avenue",
+              city: "Delhi",
+              state: "Delhi",
+              postalCode: "110001",
+              country: "India",
+              documentType: "PAN",
+              documentFront: "https://example.com/document-front-2.jpg",
+              documentBack: null,
+              selfie: "https://example.com/selfie-2.jpg",
+              status: "APPROVED",
+              verifiedBy: mockUsers[0].id,
+              verifiedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+              createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+              updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+              user: {
+                id: mockUsers[2].id,
+                email: mockUsers[2].email,
+                name: mockUsers[2].name
+              }
+            },
+            {
+              id: "kyc-3",
+              userId: mockUsers[3].id,
+              fullName: "Inactive User",
+              dateOfBirth: new Date(1992, 3, 10).toISOString(),
+              panNumber: "LMNOP9876H",
+              aadharNumber: "5678 1234 5678",
+              address: "789 Lake View",
+              city: "Bangalore",
+              state: "Karnataka",
+              postalCode: "560001",
+              country: "India",
+              documentType: "AADHAR",
+              documentFront: "https://example.com/document-front-3.jpg",
+              documentBack: "https://example.com/document-back-3.jpg",
+              selfie: "https://example.com/selfie-3.jpg",
+              status: "REJECTED",
+              rejectionReason: "Document unclear, please resubmit with better quality",
+              verifiedBy: mockUsers[0].id,
+              verifiedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+              createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+              updatedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+              user: {
+                id: mockUsers[3].id,
+                email: mockUsers[3].email,
+                name: mockUsers[3].name
+              }
+            }
+          ];
+          
+          // Generate mock payment requests
+          const mockPaymentRequests: PaymentRequest[] = [
+            {
+              id: "payment-1",
+              userId: mockUsers[1].id,
+              amount: 10000,
+              paymentMethod: "UPI",
+              paymentDetails: JSON.stringify({ upiId: "demo@upi" }),
+              status: "PENDING",
+              createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+              updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+              user: {
+                id: mockUsers[1].id,
+                email: mockUsers[1].email,
+                name: mockUsers[1].name
+              }
+            },
+            {
+              id: "payment-2",
+              userId: mockUsers[2].id,
+              amount: 25000,
+              paymentMethod: "CARD",
+              paymentDetails: JSON.stringify({ cardNumber: "xxxx-xxxx-xxxx-1234" }),
+              status: "APPROVED",
+              transactionId: "TXN-123456789",
+              approvedBy: mockUsers[0].id,
+              approvedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+              createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
+              updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+              user: {
+                id: mockUsers[2].id,
+                email: mockUsers[2].email,
+                name: mockUsers[2].name
+              }
+            },
+            {
+              id: "payment-3",
+              userId: mockUsers[3].id,
+              amount: 5000,
+              paymentMethod: "UPI",
+              paymentDetails: JSON.stringify({ upiId: "inactive@upi" }),
+              status: "REJECTED",
+              rejectionReason: "Payment failed at gateway",
+              createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+              updatedAt: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000).toISOString(),
+              user: {
+                id: mockUsers[3].id,
+                email: mockUsers[3].email,
+                name: mockUsers[3].name
+              }
+            }
+          ];
+          
+          // Generate mock login history
+          const mockLoginHistory: LoginHistory[] = [
+            {
+              id: "login-1",
+              userId: mockUsers[0].id,
+              ipAddress: "192.168.1.1",
+              userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+              deviceInfo: "Windows 10, Chrome 91.0.4472.124",
+              location: "Mumbai, India",
+              status: "SUCCESS",
+              timestamp: new Date().toISOString()
+            },
+            {
+              id: "login-2",
+              userId: mockUsers[1].id,
+              ipAddress: "192.168.1.2",
+              userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X)",
+              deviceInfo: "iPhone, iOS 14.6, Safari",
+              location: "Delhi, India",
+              status: "SUCCESS",
+              timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+            },
+            {
+              id: "login-3",
+              userId: mockUsers[2].id,
+              ipAddress: "192.168.1.3",
+              userAgent: "Mozilla/5.0 (Linux; Android 11; SM-G998B)",
+              deviceInfo: "Samsung Galaxy S21, Android 11, Chrome",
+              location: "Bangalore, India",
+              status: "SUCCESS",
+              timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+            },
+            {
+              id: "login-4",
+              userId: mockUsers[3].id,
+              ipAddress: "192.168.1.4",
+              userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+              deviceInfo: "Windows 10, Chrome 91.0.4472.124",
+              location: "Chennai, India",
+              status: "FAILED",
+              timestamp: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString()
+            }
+          ];
+          
+          // Generate mock risk report
+          const mockRiskReport: RiskReport = {
+            id: "risk-1",
+            reportDate: new Date().toISOString(),
+            totalUsers: mockUsers.length,
+            activeUsers: mockUsers.filter(u => u.isActive).length,
+            totalExposure: 750000,
+            equityExposure: 500000,
+            fnoExposure: 250000,
+            marginUtilized: 125000,
+            riskRatio: 0.42,
+            details: JSON.stringify({
+              userMetrics: {
+                totalUsers: mockUsers.length,
+                activeUsers: mockUsers.filter(u => u.isActive).length,
+                inactiveUsers: mockUsers.filter(u => !u.isActive).length
+              },
+              exposureMetrics: {
+                equityExposure: 500000,
+                fnoExposure: 250000,
+                totalExposure: 750000,
+                marginUtilized: 125000
+              },
+              riskMetrics: {
+                riskRatio: 0.42,
+                totalUserBalances: mockUsers.reduce((sum, u) => sum + u.balance, 0),
+                highRiskUsers: 1
+              }
+            }),
+            createdBy: mockUsers[0].id,
+            createdAt: new Date().toISOString()
+          };
+          
+          // Set data
           setTransactions(mockTransactions);
+          setUsers(mockUsers);
+          setKycRequests(mockKycRequests);
+          setPaymentRequests(mockPaymentRequests);
+          setLoginHistory(mockLoginHistory);
+          setRiskReport(mockRiskReport);
           
           // Set stats
           setStats({
             totalUsers: mockUsers.length,
             totalTransactions: mockTransactions.length,
             totalTradingVolume: mockTransactions.reduce((sum, t) => sum + t.total, 0),
-            activeUsers: mockUsers.length
+            activeUsers: mockUsers.filter(u => u.isActive).length,
+            pendingKyc: mockKycRequests.filter(k => k.status === 'PENDING').length,
+            pendingPayments: mockPaymentRequests.filter(p => p.status === 'PENDING').length,
+            totalExposure: mockRiskReport.totalExposure
           });
           
-          setUsers(mockUsers);
           setIsLoading(false);
         })
         .catch(err => {
@@ -189,11 +538,104 @@ export default function AdminDashboard() {
     }
   }, [user]);
 
-  // Filter users based on search query
+  // Filter data based on search query
   const filteredUsers = users.filter(user => 
     user.email.toLowerCase().includes(searchQuery.toLowerCase()) || 
     (user.name && user.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+  
+  const filteredKycRequests = kycRequests.filter(kyc => 
+    kyc.status === kycFilter || kycFilter === 'ALL'
+  );
+  
+  const filteredPaymentRequests = paymentRequests.filter(payment => 
+    payment.status === paymentFilter || paymentFilter === 'ALL'
+  );
+  
+  // Handle KYC approval/rejection
+  const handleKycAction = (kycId: string, action: 'APPROVED' | 'REJECTED', rejectionReason?: string) => {
+    setIsLoading(true);
+    
+    // In a real implementation, this would be an API call
+    setTimeout(() => {
+      const updatedKycRequests = kycRequests.map(kyc => {
+        if (kyc.id === kycId) {
+          return {
+            ...kyc,
+            status: action,
+            rejectionReason: action === 'REJECTED' ? rejectionReason : undefined,
+            verifiedBy: user?.id,
+            verifiedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+        }
+        return kyc;
+      });
+      
+      setKycRequests(updatedKycRequests);
+      setStats({
+        ...stats,
+        pendingKyc: updatedKycRequests.filter(k => k.status === 'PENDING').length
+      });
+      
+      toast({
+        title: `KYC ${action === 'APPROVED' ? 'Approved' : 'Rejected'}`,
+        description: `KYC request has been ${action.toLowerCase()} successfully.`,
+      });
+      
+      setIsLoading(false);
+    }, 1000);
+  };
+  
+  // Handle payment approval/rejection
+  const handlePaymentAction = (paymentId: string, action: 'APPROVED' | 'REJECTED', rejectionReason?: string) => {
+    setIsLoading(true);
+    
+    // In a real implementation, this would be an API call
+    setTimeout(() => {
+      const updatedPaymentRequests = paymentRequests.map(payment => {
+        if (payment.id === paymentId) {
+          return {
+            ...payment,
+            status: action,
+            rejectionReason: action === 'REJECTED' ? rejectionReason : undefined,
+            approvedBy: action === 'APPROVED' ? user?.id : undefined,
+            approvedAt: action === 'APPROVED' ? new Date().toISOString() : undefined,
+            updatedAt: new Date().toISOString()
+          };
+        }
+        return payment;
+      });
+      
+      setPaymentRequests(updatedPaymentRequests);
+      setStats({
+        ...stats,
+        pendingPayments: updatedPaymentRequests.filter(p => p.status === 'PENDING').length
+      });
+      
+      toast({
+        title: `Payment ${action === 'APPROVED' ? 'Approved' : 'Rejected'}`,
+        description: `Payment request has been ${action.toLowerCase()} successfully.`,
+      });
+      
+      setIsLoading(false);
+    }, 1000);
+  };
+  
+  // Handle report export
+  const handleExportReport = (reportType: string) => {
+    setIsLoading(true);
+    
+    // In a real implementation, this would be an API call
+    setTimeout(() => {
+      toast({
+        title: "Report Generated",
+        description: `${reportType} report has been generated in ${exportFormat.toUpperCase()} format.`,
+      });
+      
+      setIsLoading(false);
+    }, 1500);
+  };
 
   // Check if user is admin (in a real app, this would be a proper check)
   const isAdmin = user && user.email === "admin@tradepaper.com";
@@ -252,6 +694,32 @@ export default function AdminDashboard() {
               Users
             </Button>
             <Button 
+              variant={activeTab === "kyc" ? "default" : "ghost"} 
+              className="w-full justify-start"
+              onClick={() => setActiveTab("kyc")}
+            >
+              <UserCheck className="mr-2 h-4 w-4" />
+              KYC Verification
+              {stats.pendingKyc > 0 && (
+                <Badge variant="destructive" className="ml-auto">
+                  {stats.pendingKyc}
+                </Badge>
+              )}
+            </Button>
+            <Button 
+              variant={activeTab === "payments" ? "default" : "ghost"} 
+              className="w-full justify-start"
+              onClick={() => setActiveTab("payments")}
+            >
+              <CircleDollarSign className="mr-2 h-4 w-4" />
+              Payments
+              {stats.pendingPayments > 0 && (
+                <Badge variant="destructive" className="ml-auto">
+                  {stats.pendingPayments}
+                </Badge>
+              )}
+            </Button>
+            <Button 
               variant={activeTab === "stocks" ? "default" : "ghost"} 
               className="w-full justify-start"
               onClick={() => setActiveTab("stocks")}
@@ -266,6 +734,22 @@ export default function AdminDashboard() {
             >
               <Clock className="mr-2 h-4 w-4" />
               Transactions
+            </Button>
+            <Button 
+              variant={activeTab === "risk" ? "default" : "ghost"} 
+              className="w-full justify-start"
+              onClick={() => setActiveTab("risk")}
+            >
+              <PieChart className="mr-2 h-4 w-4" />
+              Risk Management
+            </Button>
+            <Button 
+              variant={activeTab === "reports" ? "default" : "ghost"} 
+              className="w-full justify-start"
+              onClick={() => setActiveTab("reports")}
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Reports
             </Button>
             <Button 
               variant={activeTab === "settings" ? "default" : "ghost"} 
@@ -902,6 +1386,1477 @@ export default function AdminDashboard() {
                     </div>
                   ))}
                 </div>
+              </>
+            )}
+            
+            {activeTab === "kyc" && (
+              <>
+                <div className="flex justify-between items-center mb-6">
+                  <h1 className="text-2xl font-bold">KYC Verification</h1>
+                  <div className="flex space-x-2">
+                    <Button variant="outline" size="sm" className="flex items-center gap-1">
+                      <RefreshCw className="w-4 h-4" />
+                      Refresh
+                    </Button>
+                    <Button variant="outline" size="sm" className="flex items-center gap-1">
+                      <Download className="w-4 h-4" />
+                      Export
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="flex justify-between mb-6">
+                  <div className="flex space-x-2">
+                    <Button 
+                      variant={kycFilter === "ALL" ? "default" : "outline"} 
+                      size="sm"
+                      onClick={() => setKycFilter("ALL")}
+                    >
+                      All
+                    </Button>
+                    <Button 
+                      variant={kycFilter === "PENDING" ? "default" : "outline"} 
+                      size="sm"
+                      onClick={() => setKycFilter("PENDING")}
+                      className="flex items-center"
+                    >
+                      Pending
+                      {stats.pendingKyc > 0 && (
+                        <Badge variant="destructive" className="ml-2">
+                          {stats.pendingKyc}
+                        </Badge>
+                      )}
+                    </Button>
+                    <Button 
+                      variant={kycFilter === "APPROVED" ? "default" : "outline"} 
+                      size="sm"
+                      onClick={() => setKycFilter("APPROVED")}
+                    >
+                      Approved
+                    </Button>
+                    <Button 
+                      variant={kycFilter === "REJECTED" ? "default" : "outline"} 
+                      size="sm"
+                      onClick={() => setKycFilter("REJECTED")}
+                    >
+                      Rejected
+                    </Button>
+                  </div>
+                  <div className="relative w-64">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                    <Input
+                      type="text"
+                      placeholder="Search by name or email..."
+                      className="pl-10 pr-4 py-2 w-full"
+                    />
+                  </div>
+                </div>
+                
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>User</TableHead>
+                        <TableHead>Document Type</TableHead>
+                        <TableHead>Submitted</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredKycRequests.map(kyc => (
+                        <TableRow key={kyc.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                                <User className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <p className="font-medium">{kyc.fullName}</p>
+                                <p className="text-xs text-muted-foreground">{kyc.user.email}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{kyc.documentType}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {new Date(kyc.createdAt).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            {kyc.status === "PENDING" && (
+                              <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800">
+                                Pending
+                              </Badge>
+                            )}
+                            {kyc.status === "APPROVED" && (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800">
+                                Approved
+                              </Badge>
+                            )}
+                            {kyc.status === "REJECTED" && (
+                              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800">
+                                Rejected
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="outline" size="sm">
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-3xl">
+                                  <DialogHeader>
+                                    <DialogTitle>KYC Details</DialogTitle>
+                                    <DialogDescription>
+                                      Review KYC information and documents
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <div className="py-4">
+                                    <div className="flex items-center gap-4 mb-6">
+                                      <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                                        <User className="w-8 h-8 text-muted-foreground" />
+                                      </div>
+                                      <div>
+                                        <h3 className="text-xl font-bold">{kyc.fullName}</h3>
+                                        <p className="text-muted-foreground">{kyc.user.email}</p>
+                                      </div>
+                                      <div className="ml-auto">
+                                        {kyc.status === "PENDING" && (
+                                          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800">
+                                            Pending
+                                          </Badge>
+                                        )}
+                                        {kyc.status === "APPROVED" && (
+                                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800">
+                                            Approved
+                                          </Badge>
+                                        )}
+                                        {kyc.status === "REJECTED" && (
+                                          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800">
+                                            Rejected
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-6">
+                                      <div>
+                                        <h4 className="text-sm font-semibold mb-3">Personal Information</h4>
+                                        <Card>
+                                          <CardContent className="p-4">
+                                            <div className="space-y-3">
+                                              <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                  <p className="text-xs text-muted-foreground">Full Name</p>
+                                                  <p className="font-medium">{kyc.fullName}</p>
+                                                </div>
+                                                <div>
+                                                  <p className="text-xs text-muted-foreground">Date of Birth</p>
+                                                  <p className="font-medium">{new Date(kyc.dateOfBirth).toLocaleDateString()}</p>
+                                                </div>
+                                              </div>
+                                              
+                                              <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                  <p className="text-xs text-muted-foreground">PAN Number</p>
+                                                  <p className="font-medium">{kyc.panNumber || "N/A"}</p>
+                                                </div>
+                                                <div>
+                                                  <p className="text-xs text-muted-foreground">Aadhar Number</p>
+                                                  <p className="font-medium">{kyc.aadharNumber || "N/A"}</p>
+                                                </div>
+                                              </div>
+                                              
+                                              <div>
+                                                <p className="text-xs text-muted-foreground">Address</p>
+                                                <p className="font-medium">{kyc.address}</p>
+                                                <p className="font-medium">{kyc.city}, {kyc.state} {kyc.postalCode}</p>
+                                                <p className="font-medium">{kyc.country}</p>
+                                              </div>
+                                            </div>
+                                          </CardContent>
+                                        </Card>
+                                      </div>
+                                      
+                                      <div>
+                                        <h4 className="text-sm font-semibold mb-3">Document Information</h4>
+                                        <Card>
+                                          <CardContent className="p-4">
+                                            <div className="space-y-3">
+                                              <div>
+                                                <p className="text-xs text-muted-foreground">Document Type</p>
+                                                <p className="font-medium">{kyc.documentType}</p>
+                                              </div>
+                                              
+                                              <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                  <p className="text-xs text-muted-foreground">Document Front</p>
+                                                  <div className="mt-1 h-32 bg-muted rounded-md flex items-center justify-center">
+                                                    <FileText className="h-8 w-8 text-muted-foreground" />
+                                                  </div>
+                                                </div>
+                                                
+                                                {kyc.documentBack && (
+                                                  <div>
+                                                    <p className="text-xs text-muted-foreground">Document Back</p>
+                                                    <div className="mt-1 h-32 bg-muted rounded-md flex items-center justify-center">
+                                                      <FileText className="h-8 w-8 text-muted-foreground" />
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </div>
+                                              
+                                              {kyc.selfie && (
+                                                <div>
+                                                  <p className="text-xs text-muted-foreground">Selfie</p>
+                                                  <div className="mt-1 h-32 bg-muted rounded-md flex items-center justify-center">
+                                                    <User className="h-8 w-8 text-muted-foreground" />
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </CardContent>
+                                        </Card>
+                                      </div>
+                                    </div>
+                                    
+                                    {kyc.status === "REJECTED" && (
+                                      <div className="mt-6">
+                                        <h4 className="text-sm font-semibold mb-3">Rejection Reason</h4>
+                                        <Card className="bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800">
+                                          <CardContent className="p-4">
+                                            <p className="text-red-700 dark:text-red-400">{kyc.rejectionReason}</p>
+                                          </CardContent>
+                                        </Card>
+                                      </div>
+                                    )}
+                                    
+                                    {kyc.status === "PENDING" && (
+                                      <div className="mt-6 flex space-x-4">
+                                        <Button 
+                                          className="flex-1 bg-green-600 hover:bg-green-700"
+                                          onClick={() => {
+                                            handleKycAction(kyc.id, "APPROVED");
+                                          }}
+                                        >
+                                          <CheckCircle2 className="mr-2 h-4 w-4" />
+                                          Approve KYC
+                                        </Button>
+                                        
+                                        <Dialog>
+                                          <DialogTrigger asChild>
+                                            <Button variant="destructive" className="flex-1">
+                                              <XCircle className="mr-2 h-4 w-4" />
+                                              Reject KYC
+                                            </Button>
+                                          </DialogTrigger>
+                                          <DialogContent>
+                                            <DialogHeader>
+                                              <DialogTitle>Reject KYC</DialogTitle>
+                                              <DialogDescription>
+                                                Please provide a reason for rejecting this KYC request.
+                                              </DialogDescription>
+                                            </DialogHeader>
+                                            <div className="py-4">
+                                              <Label htmlFor="rejection-reason">Rejection Reason</Label>
+                                              <Textarea 
+                                                id="rejection-reason" 
+                                                placeholder="Enter reason for rejection"
+                                                className="mt-2"
+                                                value={rejectionReason}
+                                                onChange={(e) => setRejectionReason(e.target.value)}
+                                              />
+                                            </div>
+                                            <DialogFooter>
+                                              <Button variant="outline">Cancel</Button>
+                                              <Button 
+                                                variant="destructive"
+                                                onClick={() => {
+                                                  if (rejectionReason.trim()) {
+                                                    handleKycAction(kyc.id, "REJECTED", rejectionReason);
+                                                    setRejectionReason("");
+                                                  } else {
+                                                    toast({
+                                                      variant: "destructive",
+                                                      title: "Rejection reason required",
+                                                      description: "Please provide a reason for rejection.",
+                                                    });
+                                                  }
+                                                }}
+                                              >
+                                                Confirm Rejection
+                                              </Button>
+                                            </DialogFooter>
+                                          </DialogContent>
+                                        </Dialog>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <DialogFooter>
+                                    <Button variant="outline">Close</Button>
+                                  </DialogFooter>
+                                </DialogContent>
+                              </Dialog>
+                              
+                              {kyc.status === "PENDING" && (
+                                <>
+                                  <Button 
+                                    variant="default" 
+                                    size="sm"
+                                    className="bg-green-600 hover:bg-green-700"
+                                    onClick={() => handleKycAction(kyc.id, "APPROVED")}
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                  
+                                  <Dialog>
+                                    <DialogTrigger asChild>
+                                      <Button variant="destructive" size="sm">
+                                        <XCircle className="w-3.5 h-3.5" />
+                                      </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                      <DialogHeader>
+                                        <DialogTitle>Reject KYC</DialogTitle>
+                                        <DialogDescription>
+                                          Please provide a reason for rejecting this KYC request.
+                                        </DialogDescription>
+                                      </DialogHeader>
+                                      <div className="py-4">
+                                        <Label htmlFor="rejection-reason">Rejection Reason</Label>
+                                        <Textarea 
+                                          id="rejection-reason" 
+                                          placeholder="Enter reason for rejection"
+                                          className="mt-2"
+                                          value={rejectionReason}
+                                          onChange={(e) => setRejectionReason(e.target.value)}
+                                        />
+                                      </div>
+                                      <DialogFooter>
+                                        <Button variant="outline">Cancel</Button>
+                                        <Button 
+                                          variant="destructive"
+                                          onClick={() => {
+                                            if (rejectionReason.trim()) {
+                                              handleKycAction(kyc.id, "REJECTED", rejectionReason);
+                                              setRejectionReason("");
+                                            } else {
+                                              toast({
+                                                variant: "destructive",
+                                                title: "Rejection reason required",
+                                                description: "Please provide a reason for rejection.",
+                                              });
+                                            }
+                                          }}
+                                        >
+                                          Confirm Rejection
+                                        </Button>
+                                      </DialogFooter>
+                                    </DialogContent>
+                                  </Dialog>
+                                </>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      
+                      {filteredKycRequests.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8">
+                            <div className="flex flex-col items-center justify-center text-muted-foreground">
+                              <ClipboardCheck className="h-12 w-12 mb-4 opacity-50" />
+                              <p>No KYC requests found with the selected filter.</p>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            )}
+            
+            {activeTab === "payments" && (
+              <>
+                <div className="flex justify-between items-center mb-6">
+                  <h1 className="text-2xl font-bold">Payment Requests</h1>
+                  <div className="flex space-x-2">
+                    <Button variant="outline" size="sm" className="flex items-center gap-1">
+                      <RefreshCw className="w-4 h-4" />
+                      Refresh
+                    </Button>
+                    <Button variant="outline" size="sm" className="flex items-center gap-1">
+                      <Download className="w-4 h-4" />
+                      Export
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="flex justify-between mb-6">
+                  <div className="flex space-x-2">
+                    <Button 
+                      variant={paymentFilter === "ALL" ? "default" : "outline"} 
+                      size="sm"
+                      onClick={() => setPaymentFilter("ALL")}
+                    >
+                      All
+                    </Button>
+                    <Button 
+                      variant={paymentFilter === "PENDING" ? "default" : "outline"} 
+                      size="sm"
+                      onClick={() => setPaymentFilter("PENDING")}
+                      className="flex items-center"
+                    >
+                      Pending
+                      {stats.pendingPayments > 0 && (
+                        <Badge variant="destructive" className="ml-2">
+                          {stats.pendingPayments}
+                        </Badge>
+                      )}
+                    </Button>
+                    <Button 
+                      variant={paymentFilter === "APPROVED" ? "default" : "outline"} 
+                      size="sm"
+                      onClick={() => setPaymentFilter("APPROVED")}
+                    >
+                      Approved
+                    </Button>
+                    <Button 
+                      variant={paymentFilter === "REJECTED" ? "default" : "outline"} 
+                      size="sm"
+                      onClick={() => setPaymentFilter("REJECTED")}
+                    >
+                      Rejected
+                    </Button>
+                  </div>
+                  <div className="relative w-64">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                    <Input
+                      type="text"
+                      placeholder="Search by name or email..."
+                      className="pl-10 pr-4 py-2 w-full"
+                    />
+                  </div>
+                </div>
+                
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>User</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Method</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredPaymentRequests.map(payment => (
+                        <TableRow key={payment.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                                <User className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <p className="font-medium">{payment.user.name || "User"}</p>
+                                <p className="text-xs text-muted-foreground">{payment.user.email}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-medium flex items-center">
+                              <IndianRupee className="w-3.5 h-3.5 mr-0.5" />
+                              {payment.amount.toFixed(2)}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {payment.paymentMethod === "UPI" ? (
+                                <div className="flex items-center">
+                                  <Wallet className="w-3 h-3 mr-1" />
+                                  UPI
+                                </div>
+                              ) : (
+                                <div className="flex items-center">
+                                  <CreditCard className="w-3 h-3 mr-1" />
+                                  Card
+                                </div>
+                              )}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {new Date(payment.createdAt).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            {payment.status === "PENDING" && (
+                              <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800">
+                                Pending
+                              </Badge>
+                            )}
+                            {payment.status === "APPROVED" && (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800">
+                                Approved
+                              </Badge>
+                            )}
+                            {payment.status === "REJECTED" && (
+                              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800">
+                                Rejected
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="outline" size="sm">
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>Payment Request Details</DialogTitle>
+                                    <DialogDescription>
+                                      Review payment request information
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <div className="py-4">
+                                    <div className="flex items-center gap-4 mb-6">
+                                      <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                                        <User className="w-8 h-8 text-muted-foreground" />
+                                      </div>
+                                      <div>
+                                        <h3 className="text-xl font-bold">{payment.user.name || "User"}</h3>
+                                        <p className="text-muted-foreground">{payment.user.email}</p>
+                                      </div>
+                                      <div className="ml-auto">
+                                        {payment.status === "PENDING" && (
+                                          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800">
+                                            Pending
+                                          </Badge>
+                                        )}
+                                        {payment.status === "APPROVED" && (
+                                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800">
+                                            Approved
+                                          </Badge>
+                                        )}
+                                        {payment.status === "REJECTED" && (
+                                          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800">
+                                            Rejected
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </div>
+                                    
+                                    <Card>
+                                      <CardContent className="p-4">
+                                        <div className="space-y-4">
+                                          <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                              <p className="text-xs text-muted-foreground">Amount</p>
+                                              <p className="text-xl font-bold flex items-center">
+                                                <IndianRupee className="w-4 h-4 mr-0.5" />
+                                                {payment.amount.toFixed(2)}
+                                              </p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-muted-foreground">Payment Method</p>
+                                              <div className="flex items-center mt-1">
+                                                {payment.paymentMethod === "UPI" ? (
+                                                  <>
+                                                    <Wallet className="w-4 h-4 mr-1 text-blue-500" />
+                                                    <span className="font-medium">UPI</span>
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    <CreditCard className="w-4 h-4 mr-1 text-purple-500" />
+                                                    <span className="font-medium">Credit/Debit Card</span>
+                                                  </>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                          
+                                          <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                              <p className="text-xs text-muted-foreground">Request Date</p>
+                                              <p className="font-medium">
+                                                {new Date(payment.createdAt).toLocaleString()}
+                                              </p>
+                                            </div>
+                                            {payment.status === "APPROVED" && payment.approvedAt && (
+                                              <div>
+                                                <p className="text-xs text-muted-foreground">Approved Date</p>
+                                                <p className="font-medium">
+                                                  {new Date(payment.approvedAt).toLocaleString()}
+                                                </p>
+                                              </div>
+                                            )}
+                                          </div>
+                                          
+                                          {payment.paymentMethod === "UPI" && payment.paymentDetails && (
+                                            <div>
+                                              <p className="text-xs text-muted-foreground">UPI Details</p>
+                                              <div className="mt-1 p-3 bg-muted rounded-md">
+                                                <p className="font-mono text-sm">
+                                                  UPI ID: {JSON.parse(payment.paymentDetails).upiId}
+                                                </p>
+                                              </div>
+                                            </div>
+                                          )}
+                                          
+                                          {payment.paymentMethod === "CARD" && payment.paymentDetails && (
+                                            <div>
+                                              <p className="text-xs text-muted-foreground">Card Details</p>
+                                              <div className="mt-1 p-3 bg-muted rounded-md">
+                                                <p className="font-mono text-sm">
+                                                  Card: **** **** **** {JSON.parse(payment.paymentDetails).cardNumber}
+                                                </p>
+                                              </div>
+                                            </div>
+                                          )}
+                                          
+                                          {payment.status === "APPROVED" && payment.transactionId && (
+                                            <div>
+                                              <p className="text-xs text-muted-foreground">Transaction ID</p>
+                                              <p className="font-mono text-sm mt-1">{payment.transactionId}</p>
+                                            </div>
+                                          )}
+                                          
+                                          {payment.status === "REJECTED" && payment.rejectionReason && (
+                                            <div>
+                                              <p className="text-xs text-muted-foreground">Rejection Reason</p>
+                                              <div className="mt-1 p-3 bg-red-50 dark:bg-red-900/10 rounded-md">
+                                                <p className="text-red-700 dark:text-red-400">{payment.rejectionReason}</p>
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </CardContent>
+                                    </Card>
+                                    
+                                    {payment.status === "PENDING" && (
+                                      <div className="mt-6 flex space-x-4">
+                                        <Button 
+                                          className="flex-1 bg-green-600 hover:bg-green-700"
+                                          onClick={() => {
+                                            handlePaymentAction(payment.id, "APPROVED");
+                                          }}
+                                        >
+                                          <CheckCircle2 className="mr-2 h-4 w-4" />
+                                          Approve Payment
+                                        </Button>
+                                        
+                                        <Dialog>
+                                          <DialogTrigger asChild>
+                                            <Button variant="destructive" className="flex-1">
+                                              <XCircle className="mr-2 h-4 w-4" />
+                                              Reject Payment
+                                            </Button>
+                                          </DialogTrigger>
+                                          <DialogContent>
+                                            <DialogHeader>
+                                              <DialogTitle>Reject Payment</DialogTitle>
+                                              <DialogDescription>
+                                                Please provide a reason for rejecting this payment request.
+                                              </DialogDescription>
+                                            </DialogHeader>
+                                            <div className="py-4">
+                                              <Label htmlFor="payment-rejection-reason">Rejection Reason</Label>
+                                              <Textarea 
+                                                id="payment-rejection-reason" 
+                                                placeholder="Enter reason for rejection"
+                                                className="mt-2"
+                                                value={rejectionReason}
+                                                onChange={(e) => setRejectionReason(e.target.value)}
+                                              />
+                                            </div>
+                                            <DialogFooter>
+                                              <Button variant="outline">Cancel</Button>
+                                              <Button 
+                                                variant="destructive"
+                                                onClick={() => {
+                                                  if (rejectionReason.trim()) {
+                                                    handlePaymentAction(payment.id, "REJECTED", rejectionReason);
+                                                    setRejectionReason("");
+                                                  } else {
+                                                    toast({
+                                                      variant: "destructive",
+                                                      title: "Rejection reason required",
+                                                      description: "Please provide a reason for rejection.",
+                                                    });
+                                                  }
+                                                }}
+                                              >
+                                                Confirm Rejection
+                                              </Button>
+                                            </DialogFooter>
+                                          </DialogContent>
+                                        </Dialog>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <DialogFooter>
+                                    <Button variant="outline">Close</Button>
+                                  </DialogFooter>
+                                </DialogContent>
+                              </Dialog>
+                              
+                              {payment.status === "PENDING" && (
+                                <>
+                                  <Button 
+                                    variant="default" 
+                                    size="sm"
+                                    className="bg-green-600 hover:bg-green-700"
+                                    onClick={() => handlePaymentAction(payment.id, "APPROVED")}
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                  
+                                  <Dialog>
+                                    <DialogTrigger asChild>
+                                      <Button variant="destructive" size="sm">
+                                        <XCircle className="w-3.5 h-3.5" />
+                                      </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                      <DialogHeader>
+                                        <DialogTitle>Reject Payment</DialogTitle>
+                                        <DialogDescription>
+                                          Please provide a reason for rejecting this payment request.
+                                        </DialogDescription>
+                                      </DialogHeader>
+                                      <div className="py-4">
+                                        <Label htmlFor="payment-rejection-reason">Rejection Reason</Label>
+                                        <Textarea 
+                                          id="payment-rejection-reason" 
+                                          placeholder="Enter reason for rejection"
+                                          className="mt-2"
+                                          value={rejectionReason}
+                                          onChange={(e) => setRejectionReason(e.target.value)}
+                                        />
+                                      </div>
+                                      <DialogFooter>
+                                        <Button variant="outline">Cancel</Button>
+                                        <Button 
+                                          variant="destructive"
+                                          onClick={() => {
+                                            if (rejectionReason.trim()) {
+                                              handlePaymentAction(payment.id, "REJECTED", rejectionReason);
+                                              setRejectionReason("");
+                                            } else {
+                                              toast({
+                                                variant: "destructive",
+                                                title: "Rejection reason required",
+                                                description: "Please provide a reason for rejection.",
+                                              });
+                                            }
+                                          }}
+                                        >
+                                          Confirm Rejection
+                                        </Button>
+                                      </DialogFooter>
+                                    </DialogContent>
+                                  </Dialog>
+                                </>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      
+                      {filteredPaymentRequests.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8">
+                            <div className="flex flex-col items-center justify-center text-muted-foreground">
+                              <CircleDollarSign className="h-12 w-12 mb-4 opacity-50" />
+                              <p>No payment requests found with the selected filter.</p>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            )}
+            
+            {activeTab === "risk" && (
+              <>
+                <div className="flex justify-between items-center mb-6">
+                  <h1 className="text-2xl font-bold">Risk Management</h1>
+                  <div className="flex space-x-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex items-center gap-1"
+                      onClick={() => {
+                        setIsLoading(true);
+                        setTimeout(() => {
+                          toast({
+                            title: "Risk Report Generated",
+                            description: "New risk report has been generated successfully.",
+                          });
+                          setIsLoading(false);
+                        }, 1500);
+                      }}
+                      disabled={isLoading}
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                      Generate New Report
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex items-center gap-1"
+                      onClick={() => handleExportReport('risk')}
+                    >
+                      <Download className="w-4 h-4" />
+                      Export Report
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                  <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-950/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-center">
+                        <CardTitle className="text-sm font-medium text-blue-800 dark:text-blue-400">
+                          Total Exposure
+                        </CardTitle>
+                        <Activity className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-blue-800 dark:text-blue-400 flex items-center">
+                        <IndianRupee className="w-5 h-5 mr-1" />
+                        {riskReport?.totalExposure.toLocaleString()}
+                      </div>
+                      <p className="text-xs text-blue-700 dark:text-blue-500 mt-1">
+                        Combined equity and F&O exposure
+                      </p>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-center">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                          Equity Exposure
+                        </CardTitle>
+                        <LineChart className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold flex items-center">
+                        <IndianRupee className="w-5 h-5 mr-1" />
+                        {riskReport?.equityExposure.toLocaleString()}
+                      </div>
+                      <div className="w-full h-2 bg-muted mt-2 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-blue-500" 
+                          style={{ width: `${(riskReport?.equityExposure || 0) / (riskReport?.totalExposure || 1) * 100}%` }}
+                        ></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-center">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                          F&O Exposure
+                        </CardTitle>
+                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold flex items-center">
+                        <IndianRupee className="w-5 h-5 mr-1" />
+                        {riskReport?.fnoExposure.toLocaleString()}
+                      </div>
+                      <div className="w-full h-2 bg-muted mt-2 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-purple-500" 
+                          style={{ width: `${(riskReport?.fnoExposure || 0) / (riskReport?.totalExposure || 1) * 100}%` }}
+                        ></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-center">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                          Risk Ratio
+                        </CardTitle>
+                        <Percent className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {(riskReport?.riskRatio || 0).toFixed(2)}
+                      </div>
+                      <div className="w-full h-2 bg-muted mt-2 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${(riskReport?.riskRatio || 0) > 0.5 ? 'bg-red-500' : 'bg-green-500'}`}
+                          style={{ width: `${(riskReport?.riskRatio || 0) * 100}%` }}
+                        ></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Exposure Breakdown</CardTitle>
+                      <CardDescription>
+                        Distribution of exposure across different segments
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-64 flex items-center justify-center">
+                        <div className="w-48 h-48 rounded-full border-8 border-muted relative">
+                          <div 
+                            className="absolute inset-0 bg-blue-500 rounded-full"
+                            style={{ 
+                              clipPath: `polygon(50% 50%, 50% 0%, ${50 + 50 * Math.cos(2 * Math.PI * (riskReport?.equityExposure || 0) / (riskReport?.totalExposure || 1))}% ${50 + 50 * Math.sin(2 * Math.PI * (riskReport?.equityExposure || 0) / (riskReport?.totalExposure || 1))}%)` 
+                            }}
+                          ></div>
+                          <div 
+                            className="absolute inset-0 bg-purple-500 rounded-full"
+                            style={{ 
+                              clipPath: `polygon(50% 50%, ${50 + 50 * Math.cos(2 * Math.PI * (riskReport?.equityExposure || 0) / (riskReport?.totalExposure || 1))}% ${50 + 50 * Math.sin(2 * Math.PI * (riskReport?.equityExposure || 0) / (riskReport?.totalExposure || 1))}%, 100% 50%, 50% 100%, 0% 50%)` 
+                            }}
+                          ></div>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-32 h-32 bg-background rounded-full flex items-center justify-center">
+                              <div className="text-center">
+                                <p className="text-xs text-muted-foreground">Total</p>
+                                <p className="font-bold flex items-center justify-center">
+                                  <IndianRupee className="w-3 h-3 mr-0.5" />
+                                  {riskReport?.totalExposure.toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        <div className="flex items-center">
+                          <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                          <div>
+                            <p className="text-sm">Equity</p>
+                            <p className="text-xs text-muted-foreground">
+                              {((riskReport?.equityExposure || 0) / (riskReport?.totalExposure || 1) * 100).toFixed(1)}%
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center">
+                          <div className="w-3 h-3 bg-purple-500 rounded-full mr-2"></div>
+                          <div>
+                            <p className="text-sm">F&O</p>
+                            <p className="text-xs text-muted-foreground">
+                              {((riskReport?.fnoExposure || 0) / (riskReport?.totalExposure || 1) * 100).toFixed(1)}%
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Risk Metrics</CardTitle>
+                      <CardDescription>
+                        Key risk indicators and metrics
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-6">
+                        <div>
+                          <div className="flex justify-between mb-2">
+                            <p className="text-sm font-medium">Margin Utilization</p>
+                            <p className="text-sm font-medium">
+                              {((riskReport?.marginUtilized || 0) / (riskReport?.fnoExposure || 1) * 100).toFixed(1)}%
+                            </p>
+                          </div>
+                          <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-amber-500" 
+                              style={{ width: `${(riskReport?.marginUtilized || 0) / (riskReport?.fnoExposure || 1) * 100}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <div className="flex justify-between mb-2">
+                            <p className="text-sm font-medium">Exposure to Balance Ratio</p>
+                            <p className="text-sm font-medium">
+                              {riskReport?.riskRatio.toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full ${(riskReport?.riskRatio || 0) > 0.5 ? 'bg-red-500' : 'bg-green-500'}`}
+                              style={{ width: `${(riskReport?.riskRatio || 0) * 100}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                          <div className="bg-muted/30 p-3 rounded-lg">
+                            <p className="text-sm text-muted-foreground">Active Users</p>
+                            <p className="text-xl font-bold">{riskReport?.activeUsers}</p>
+                          </div>
+                          <div className="bg-muted/30 p-3 rounded-lg">
+                            <p className="text-sm text-muted-foreground">High Risk Users</p>
+                            <p className="text-xl font-bold">1</p>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                <Card>
+                  <CardHeader>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <CardTitle>Risk Report Details</CardTitle>
+                        <CardDescription>
+                          Generated on {riskReport ? new Date(riskReport.reportDate).toLocaleString() : new Date().toLocaleString()}
+                        </CardDescription>
+                      </div>
+                      <Button variant="outline" size="sm" className="flex items-center gap-1">
+                        <Download className="w-4 h-4" />
+                        Download Full Report
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Metric</TableHead>
+                          <TableHead>Value</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <TableRow>
+                          <TableCell>Total Exposure</TableCell>
+                          <TableCell>₹{riskReport?.totalExposure.toLocaleString()}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800">
+                              Normal
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell>Equity Exposure</TableCell>
+                          <TableCell>₹{riskReport?.equityExposure.toLocaleString()}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800">
+                              Low Risk
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell>F&O Exposure</TableCell>
+                          <TableCell>₹{riskReport?.fnoExposure.toLocaleString()}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800">
+                              Medium Risk
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell>Margin Utilized</TableCell>
+                          <TableCell>₹{riskReport?.marginUtilized.toLocaleString()}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800">
+                              Medium Risk
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell>Risk Ratio</TableCell>
+                          <TableCell>{riskReport?.riskRatio.toFixed(2)}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800">
+                              Medium Risk
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+            
+            {activeTab === "reports" && (
+              <>
+                <div className="flex justify-between items-center mb-6">
+                  <h1 className="text-2xl font-bold">Reports</h1>
+                  <div className="flex space-x-2">
+                    <Select value={exportFormat} onValueChange={setExportFormat}>
+                      <SelectTrigger className="w-[120px]">
+                        <SelectValue placeholder="Format" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="csv">
+                          <div className="flex items-center">
+                            <FileSpreadsheet className="w-4 h-4 mr-2" />
+                            CSV
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="pdf">
+                          <div className="flex items-center">
+                            <FilePdf className="w-4 h-4 mr-2" />
+                            PDF
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="json">
+                          <div className="flex items-center">
+                            <FileJson className="w-4 h-4 mr-2" />
+                            JSON
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                  <Card className="hover:border-blue-500/50 transition-colors cursor-pointer">
+                    <CardHeader>
+                      <div className="flex justify-between items-center">
+                        <CardTitle>User Reports</CardTitle>
+                        <Users className="h-5 w-5 text-blue-500" />
+                      </div>
+                      <CardDescription>
+                        User registration, activity, and demographics
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div 
+                          className="p-3 rounded-md hover:bg-muted/50 cursor-pointer"
+                          onClick={() => handleExportReport('users')}
+                        >
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center">
+                              <User className="w-4 h-4 mr-2 text-blue-500" />
+                              <span className="font-medium">User List</span>
+                            </div>
+                            <Download className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Complete list of all users with details
+                          </p>
+                        </div>
+                        
+                        <div 
+                          className="p-3 rounded-md hover:bg-muted/50 cursor-pointer"
+                          onClick={() => handleExportReport('user-activity')}
+                        >
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center">
+                              <Activity className="w-4 h-4 mr-2 text-blue-500" />
+                              <span className="font-medium">User Activity</span>
+                            </div>
+                            <Download className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Login history and user actions
+                          </p>
+                        </div>
+                        
+                        <div 
+                          className="p-3 rounded-md hover:bg-muted/50 cursor-pointer"
+                          onClick={() => handleExportReport('kyc-status')}
+                        >
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center">
+                              <ClipboardCheck className="w-4 h-4 mr-2 text-blue-500" />
+                              <span className="font-medium">KYC Status</span>
+                            </div>
+                            <Download className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            KYC verification status for all users
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card className="hover:border-green-500/50 transition-colors cursor-pointer">
+                    <CardHeader>
+                      <div className="flex justify-between items-center">
+                        <CardTitle>Financial Reports</CardTitle>
+                        <IndianRupee className="h-5 w-5 text-green-500" />
+                      </div>
+                      <CardDescription>
+                        Transactions, payments, and financial metrics
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div 
+                          className="p-3 rounded-md hover:bg-muted/50 cursor-pointer"
+                          onClick={() => handleExportReport('transactions')}
+                        >
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center">
+                              <ArrowUpRight className="w-4 h-4 mr-2 text-green-500" />
+                              <span className="font-medium">Transactions</span>
+                            </div>
+                            <Download className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            All trading transactions with details
+                          </p>
+                        </div>
+                        
+                        <div 
+                          className="p-3 rounded-md hover:bg-muted/50 cursor-pointer"
+                          onClick={() => handleExportReport('payments')}
+                        >
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center">
+                              <Wallet className="w-4 h-4 mr-2 text-green-500" />
+                              <span className="font-medium">Payment Requests</span>
+                            </div>
+                            <Download className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            All payment requests and their status
+                          </p>
+                        </div>
+                        
+                        <div 
+                          className="p-3 rounded-md hover:bg-muted/50 cursor-pointer"
+                          onClick={() => handleExportReport('portfolio-summary')}
+                        >
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center">
+                              <Briefcase className="w-4 h-4 mr-2 text-green-500" />
+                              <span className="font-medium">Portfolio Summary</span>
+                            </div>
+                            <Download className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Summary of all user portfolios
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card className="hover:border-purple-500/50 transition-colors cursor-pointer">
+                    <CardHeader>
+                      <div className="flex justify-between items-center">
+                        <CardTitle>Risk Reports</CardTitle>
+                        <AlertTriangle className="h-5 w-5 text-purple-500" />
+                      </div>
+                      <CardDescription>
+                        Risk metrics, exposure, and compliance
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div 
+                          className="p-3 rounded-md hover:bg-muted/50 cursor-pointer"
+                          onClick={() => handleExportReport('risk-exposure')}
+                        >
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center">
+                              <PieChart className="w-4 h-4 mr-2 text-purple-500" />
+                              <span className="font-medium">Risk Exposure</span>
+                            </div>
+                            <Download className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Detailed breakdown of risk exposure
+                          </p>
+                        </div>
+                        
+                        <div 
+                          className="p-3 rounded-md hover:bg-muted/50 cursor-pointer"
+                          onClick={() => handleExportReport('fno-positions')}
+                        >
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center">
+                              <TrendingUp className="w-4 h-4 mr-2 text-purple-500" />
+                              <span className="font-medium">F&O Positions</span>
+                            </div>
+                            <Download className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            All futures and options positions
+                          </p>
+                        </div>
+                        
+                        <div 
+                          className="p-3 rounded-md hover:bg-muted/50 cursor-pointer"
+                          onClick={() => handleExportReport('margin-utilization')}
+                        >
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center">
+                              <Percent className="w-4 h-4 mr-2 text-purple-500" />
+                              <span className="font-medium">Margin Utilization</span>
+                            </div>
+                            <Download className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Margin utilization by users and segments
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Custom Report</CardTitle>
+                    <CardDescription>
+                      Generate a custom report with specific parameters
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="report-type">Report Type</Label>
+                            <Select defaultValue="transactions">
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select report type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="users">Users</SelectItem>
+                                <SelectItem value="transactions">Transactions</SelectItem>
+                                <SelectItem value="kyc">KYC Verification</SelectItem>
+                                <SelectItem value="payments">Payments</SelectItem>
+                                <SelectItem value="risk">Risk Metrics</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="date-range">Date Range</Label>
+                            <div className="grid grid-cols-2 gap-4">
+                              <Input type="date" placeholder="Start date" />
+                              <Input type="date" placeholder="End date" />
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="format">Export Format</Label>
+                            <RadioGroup defaultValue="csv" className="flex space-x-4">
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="csv" id="csv" />
+                                <Label htmlFor="csv" className="flex items-center">
+                                  <FileSpreadsheet className="w-4 h-4 mr-1" />
+                                  CSV
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="pdf" id="pdf" />
+                                <Label htmlFor="pdf" className="flex items-center">
+                                  <FilePdf className="w-4 h-4 mr-1" />
+                                  PDF
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="json" id="json" />
+                                <Label htmlFor="json" className="flex items-center">
+                                  <FileJson className="w-4 h-4 mr-1" />
+                                  JSON
+                                </Label>
+                              </div>
+                            </RadioGroup>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Include Fields</Label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="flex items-center space-x-2">
+                                <Switch id="field-user" defaultChecked />
+                                <Label htmlFor="field-user">User Information</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Switch id="field-amount" defaultChecked />
+                                <Label htmlFor="field-amount">Amount/Value</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Switch id="field-date" defaultChecked />
+                                <Label htmlFor="field-date">Date/Time</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Switch id="field-status" defaultChecked />
+                                <Label htmlFor="field-status">Status</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Switch id="field-details" defaultChecked />
+                                <Label htmlFor="field-details">Details</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Switch id="field-metrics" defaultChecked />
+                                <Label htmlFor="field-metrics">Metrics</Label>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="additional-filters">Additional Filters</Label>
+                            <Textarea 
+                              id="additional-filters" 
+                              placeholder="Enter any additional filters or notes for the report"
+                              className="min-h-[100px]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter className="flex justify-end">
+                    <Button 
+                      className="flex items-center"
+                      onClick={() => {
+                        setIsLoading(true);
+                        setTimeout(() => {
+                          toast({
+                            title: "Custom Report Generated",
+                            description: "Your custom report has been generated successfully.",
+                          });
+                          setIsLoading(false);
+                        }, 1500);
+                      }}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4 mr-2" />
+                      )}
+                      Generate Report
+                    </Button>
+                  </CardFooter>
+                </Card>
               </>
             )}
             
