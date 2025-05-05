@@ -20,13 +20,48 @@ const AdminLoginPage = () => {
   const { isIframe } = useIsIFrame();
   const { toast } = useToast();
 
+  // Clear any existing auth state on component mount
+  useEffect(() => {
+    const clearAuthState = async () => {
+      try {
+        // Clear any cached credentials from localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('supabase.auth.token');
+          
+          // Clear service worker cache if possible
+          if ('caches' in window) {
+            try {
+              const cacheKeys = await caches.keys();
+              for (const key of cacheKeys) {
+                await caches.delete(key);
+              }
+              console.log('Cache cleared successfully');
+            } catch (cacheError) {
+              console.error('Error clearing cache:', cacheError);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error clearing auth state:', error);
+      }
+    };
+    
+    clearAuthState();
+  }, []);
+
   // Ensure admin user exists in the database
   useEffect(() => {
     const setupAdmin = async () => {
       setIsLoading(true);
       try {
+        console.log('Setting up admin account...');
         const response = await fetch('/api/demo/create-admin-user', {
           method: 'POST',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          },
         });
         
         const data = await response.json();
@@ -39,7 +74,7 @@ const AdminLoginPage = () => {
             description: data.error || "There was an error setting up the admin account. Please try again.",
           });
         } else {
-          console.log('Admin account setup successful');
+          console.log('Admin account setup successful:', data);
         }
       } catch (error) {
         console.error('Error setting up admin account:', error);
@@ -62,19 +97,30 @@ const AdminLoginPage = () => {
     try {
       const { email, password } = formik.values;
       
-      // First ensure the admin user exists
+      console.log('Attempting admin login with:', email);
+      
+      // First ensure the admin user exists with no-cache headers
       const setupResponse = await fetch('/api/demo/create-admin-user', {
         method: 'POST',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
       });
       
+      const setupData = await setupResponse.json();
+      
       if (!setupResponse.ok) {
-        const errorData = await setupResponse.json();
-        console.error('Error setting up admin account before login:', errorData);
-        throw new Error(errorData.error || 'Failed to setup admin account');
+        console.error('Error setting up admin account before login:', setupData);
+        throw new Error(setupData.error || 'Failed to setup admin account');
       }
+      
+      console.log('Admin setup successful, proceeding to sign in');
       
       // Then attempt to sign in
       await signIn(email, password);
+      console.log('Sign in successful, redirecting to admin page');
       router.push('/admin');
     } catch (error) {
       console.error('Login error:', error);

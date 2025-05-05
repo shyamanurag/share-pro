@@ -21,6 +21,17 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Skip caching for admin-related URLs, auth endpoints, and API requests
+  if (
+    event.request.url.includes('/admin') ||
+    event.request.url.includes('/api/') ||
+    event.request.url.includes('/auth/') ||
+    event.request.url.includes('admin-login')
+  ) {
+    return event.respondWith(fetch(event.request));
+  }
+  
+  // For other requests, try the cache first
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
@@ -42,7 +53,8 @@ self.addEventListener('fetch', (event) => {
               .then((cache) => {
                 // Don't cache API requests or authentication endpoints
                 if (!event.request.url.includes('/api/') && 
-                    !event.request.url.includes('/auth/')) {
+                    !event.request.url.includes('/auth/') &&
+                    !event.request.url.includes('/admin')) {
                   cache.put(event.request, responseToCache);
                 }
               });

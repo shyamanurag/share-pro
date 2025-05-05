@@ -8,21 +8,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    console.log('Starting admin user creation/verification process');
     const supabase = createClient(req, res);
     const adminEmail = 'admin@tradepaper.com';
     const adminPassword = 'demo1234';
     
+    // First, check if the admin user exists in the database
+    const existingDbUser = await prisma.user.findFirst({
+      where: {
+        email: adminEmail,
+        role: 'ADMIN'
+      }
+    });
+    
+    console.log('Existing admin in database:', existingDbUser ? 'Found' : 'Not found');
+    
     // Try to sign in with admin credentials first
+    console.log('Attempting to sign in admin user');
     const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
       email: adminEmail,
       password: adminPassword,
     });
     
+    if (signInError) {
+      console.log('Admin sign in failed:', signInError.message);
+    } else {
+      console.log('Admin sign in successful');
+    }
+    
     let adminUser = signInData?.user;
+    let adminId = adminUser?.id;
     
     // If sign in fails, try to create the admin user
     if (signInError || !adminUser) {
-      console.log('Admin sign in failed, attempting to create admin user');
+      console.log('Attempting to create admin user');
       
       // Try to create the admin user
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
@@ -33,45 +52,66 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       });
       
-      // If sign up fails with "User already registered" but sign in also failed,
-      // there might be an issue with the password
-      if (signUpError && signUpError.message === 'User already registered') {
-        console.log('Admin user exists but sign in failed. Attempting admin password reset');
+      if (signUpError) {
+        console.log('Admin sign up error:', signUpError.message);
         
-        // For demo purposes, we'll try to update the user's password directly
-        // In a real app, you'd use a proper password reset flow
-        try {
-          // This is a workaround for demo purposes only
-          const { error: updateError } = await supabase.auth.admin.updateUserById(
-            signUpData?.user?.id || 'unknown',
-            { password: adminPassword }
-          );
+        // If sign up fails with "User already registered" but sign in also failed,
+        // there might be an issue with the password
+        if (signUpError.message === 'User already registered') {
+          console.log('Admin user exists but sign in failed. Attempting to retrieve user');
           
-          if (updateError) {
-            console.error('Failed to update admin password:', updateError);
-          } else {
-            // Try signing in again after password update
-            const { data: retryData } = await supabase.auth.signInWithPassword({
-              email: adminEmail,
-              password: adminPassword,
-            });
+          // Try to get the user by email
+          const { data: userData } = await supabase.auth.admin.listUsers();
+          const existingUser = userData?.users?.find(u => u.email === adminEmail);
+          
+          if (existingUser) {
+            console.log('Found existing admin user, attempting password reset');
+            adminId = existingUser.id;
             
-            adminUser = retryData?.user;
+            // Reset the password
+            const { error: updateError } = await supabase.auth.admin.updateUserById(
+              existingUser.id,
+              { password: adminPassword }
+            );
+            
+            if (updateError) {
+              console.error('Failed to update admin password:', updateError);
+            } else {
+              console.log('Admin password updated successfully');
+              
+              // Try signing in again after password update
+              const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
+                email: adminEmail,
+                password: adminPassword,
+              });
+              
+              if (retryError) {
+                console.error('Retry sign in failed:', retryError);
+              } else {
+                console.log('Retry sign in successful');
+                adminUser = retryData?.user;
+              }
+            }
+          } else {
+            console.log('Could not find admin user in Supabase');
           }
-        } catch (updateError) {
-          console.error('Error updating admin password:', updateError);
         }
-      } else if (!signUpError) {
+      } else {
         // Sign up succeeded
+        console.log('Admin sign up successful');
         adminUser = signUpData?.user;
+        adminId = adminUser?.id;
       }
     }
     
-    // If we have an admin user, ensure they exist in our database with the correct role
-    if (adminUser) {
+    // If we have an admin ID (either from sign in, sign up, or user lookup),
+    // ensure they exist in our database with the correct role
+    if (adminId) {
       try {
-        await prisma.user.upsert({
-          where: { id: adminUser.id },
+        console.log('Upserting admin user in database with ID:', adminId);
+        
+        const upsertedUser = await prisma.user.upsert({
+          where: { id: adminId },
           update: {
             name: 'Admin User',
             balance: 1000000,
@@ -80,8 +120,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             lastLogin: new Date(),
           },
           create: {
-            id: adminUser.id,
-            email: adminUser.email!,
+            id: adminId,
+            email: adminEmail,
             name: 'Admin User',
             balance: 1000000,
             role: 'ADMIN',
@@ -90,7 +130,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
         });
         
-        console.log('Admin user created/updated in database successfully');
+        console.log('Admin user created/updated in database successfully:', upsertedUser.id);
+        
+        return res.status(200).json({ 
+          success: true, 
+          message: 'Admin user created/verified successfully',
+          userId: upsertedUser.id
+        });
       } catch (prismaError) {
         console.error('Error upserting admin user in database:', prismaError);
         return res.status(500).json({ 
@@ -105,10 +151,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         signInError: signInError ? signInError.message : null
       });
     }
-
-    return res.status(200).json({ success: true });
   } catch (error) {
     console.error('Error in create-admin-user:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 }
