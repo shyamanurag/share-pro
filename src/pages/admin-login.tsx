@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { useIsIFrame } from '@/hooks/useIsIFrame';
+import { createClient } from '@/util/supabase/component';
 
 const AdminLoginPage = () => {
   const router = useRouter();
@@ -306,12 +307,52 @@ const AdminLoginPage = () => {
                   </div>
                 </div>
                 <Button
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    setIsLoading(true);
+                    
+                    try {
+                      // Ensure admin user exists
+                      const timestamp = new Date().getTime(); // Add timestamp to prevent caching
+                      await fetch(`/api/demo/create-admin-user?t=${timestamp}`, {
+                        method: 'POST',
+                        headers: {
+                          'Cache-Control': 'no-cache, no-store, must-revalidate',
+                          'Pragma': 'no-cache',
+                          'Expires': '0'
+                        },
+                      });
+                      
+                      // Set admin credentials
+                      formik.setFieldValue('email', 'admin@tradepaper.com');
+                      formik.setFieldValue('password', 'demo1234');
+                      
+                      // Submit form after a short delay to allow field values to update
+                      setTimeout(() => {
+                        handleLogin(e);
+                      }, 100);
+                    } catch (error) {
+                      console.error('Error setting up admin account:', error);
+                      toast({
+                        variant: "destructive",
+                        title: "Admin login failed",
+                        description: "Unable to set up admin account. Please try again.",
+                      });
+                      setIsLoading(false);
+                    }
+                  }}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isLoading ? "Logging in..." : "Auto Login as Admin"}
+                </Button>
+                
+                <Button
                   type="submit"
-                  className="w-full"
+                  className="w-full mt-2"
                   disabled={isLoading || initializing || !formik.values.email || !formik.values.password || !formik.isValid}
                   onClick={handleLogin}
                 >
-                  {isLoading ? "Logging in..." : "Login as Admin"}
+                  Login with Credentials
                 </Button>
                 
                 <div className="mt-4 text-center">
