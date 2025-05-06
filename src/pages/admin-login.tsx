@@ -25,12 +25,14 @@ const AdminLoginPage = () => {
     try {
       // Clear any existing auth state
       if (typeof window !== 'undefined') {
+        console.log('Clearing local storage and session storage');
         localStorage.clear();
         sessionStorage.clear();
       }
       
       // Unregister service workers if they exist
       if ('serviceWorker' in navigator) {
+        console.log('Unregistering service workers');
         const registrations = await navigator.serviceWorker.getRegistrations();
         for (const registration of registrations) {
           await registration.unregister();
@@ -39,30 +41,41 @@ const AdminLoginPage = () => {
       
       // Clear caches
       if ('caches' in window) {
+        console.log('Clearing browser caches');
         const cacheKeys = await caches.keys();
         await Promise.all(cacheKeys.map(key => caches.delete(key)));
       }
       
       console.log('Starting one-click admin login process');
       
+      // First sign out to ensure a clean state
+      try {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+        console.log('Successfully signed out before new sign in');
+      } catch (signOutError) {
+        console.error('Error during pre-signin signout:', signOutError);
+        // Continue anyway
+      }
+      
+      // Wait a moment to ensure signout is complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // Use demo user credentials but set admin role in AuthContext
       try {
         // Sign in with demo credentials
+        console.log('Attempting to sign in with demo@papertrader.app');
         await signIn('demo@papertrader.app', 'demo1234');
         console.log('Admin sign in successful using demo account');
         
         // Wait a moment to ensure the auth state is updated
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
         // Force a hard redirect to the admin page
         console.log('Redirecting to admin page');
-        router.push('/admin');
         
-        // As a fallback, also use direct location change after a short delay
-        setTimeout(() => {
-          console.log('Fallback: Using direct location change to admin page');
-          window.location.href = '/admin';
-        }, 1500);
+        // Use window.location for a hard redirect instead of router.push
+        window.location.href = '/admin';
       } catch (signInError) {
         console.error('Admin sign in error:', signInError);
         
@@ -70,21 +83,16 @@ const AdminLoginPage = () => {
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         try {
+          console.log('Retrying sign in with demo@papertrader.app');
           await signIn('demo@papertrader.app', 'demo1234');
           console.log('Admin sign in successful on retry');
           
           // Wait a moment to ensure the auth state is updated
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 2000));
           
           // Force a hard redirect to the admin page
           console.log('Redirecting to admin page after retry');
-          router.push('/admin');
-          
-          // As a fallback, also use direct location change after a short delay
-          setTimeout(() => {
-            console.log('Fallback: Using direct location change to admin page after retry');
-            window.location.href = '/admin';
-          }, 1500);
+          window.location.href = '/admin';
         } catch (retryError) {
           console.error('Admin sign in retry error:', retryError);
           throw retryError;
@@ -112,14 +120,35 @@ const AdminLoginPage = () => {
       
       // Clear any existing auth state
       if (typeof window !== 'undefined') {
+        console.log('Clearing local storage and session storage');
         localStorage.clear();
         sessionStorage.clear();
       }
       
+      // First sign out to ensure a clean state
+      try {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+        console.log('Successfully signed out before new sign in');
+      } catch (signOutError) {
+        console.error('Error during pre-signin signout:', signOutError);
+        // Continue anyway
+      }
+      
+      // Wait a moment to ensure signout is complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      console.log(`Attempting to sign in with email: ${email}`);
+      
       // Sign in with provided credentials
       await signIn(email, password);
+      console.log('Sign in successful');
+      
+      // Wait a moment to ensure the auth state is updated
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Use direct location change for more reliable navigation
+      console.log('Redirecting to admin page');
       window.location.href = '/admin';
     } catch (error) {
       console.error('Login error:', error);

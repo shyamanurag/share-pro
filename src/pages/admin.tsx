@@ -673,15 +673,24 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     console.log('Admin check - User email:', user?.email);
+    console.log('Admin check - User metadata:', user?.user_metadata);
+    console.log('Admin check - App metadata:', user?.app_metadata);
     console.log('Admin check - Is admin:', isAdmin);
     
-    if (user && !isAdmin) {
-      console.log('User is not admin, redirecting to dashboard');
-      router.replace('/dashboard-india');
-    } else if (!user) {
-      console.log('No user found, redirecting to admin login');
-      router.replace('/admin-login');
-    }
+    // Add a delay to ensure auth state is fully loaded
+    const checkAdminStatus = setTimeout(() => {
+      if (user && !isAdmin) {
+        console.log('User is not admin, redirecting to dashboard');
+        router.replace('/dashboard-india');
+      } else if (!user) {
+        console.log('No user found, redirecting to admin login');
+        router.replace('/admin-login');
+      } else {
+        console.log('Admin access granted');
+      }
+    }, 1000);
+    
+    return () => clearTimeout(checkAdminStatus);
   }, [user, isAdmin, router]);
 
   if (!user) {
