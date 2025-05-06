@@ -12,6 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const { stockId } = req.query;
+    const { watchlistId } = req.query;
     
     if (!stockId || typeof stockId !== 'string') {
       return res.status(400).json({ error: 'Stock ID is required' });
@@ -20,20 +21,48 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // DELETE: Remove stock from watchlist
     if (req.method === 'DELETE') {
       // Find user's watchlist
-      const watchlist = await prisma.watchlist.findFirst({
-        where: { userId: user.id },
-      });
+      let targetWatchlistId;
+      
+      if (watchlistId && typeof watchlistId === 'string') {
+        // Check if the specified watchlist belongs to the user
+        const watchlist = await prisma.watchlist.findFirst({
+          where: { 
+            id: watchlistId,
+            userId: user.id 
+          },
+        });
+        
+        if (!watchlist) {
+          return res.status(404).json({ error: 'Watchlist not found or access denied' });
+        }
+        
+        targetWatchlistId = watchlistId;
+      } else {
+        // Use the default watchlist if no watchlistId specified
+        const watchlist = await prisma.watchlist.findFirst({
+          where: { userId: user.id },
+          orderBy: { updatedAt: 'desc' },
+        });
 
-      if (!watchlist) {
-        return res.status(404).json({ error: 'Watchlist not found' });
+        if (!watchlist) {
+          return res.status(404).json({ error: 'Watchlist not found' });
+        }
+        
+        targetWatchlistId = watchlist.id;
       }
 
       // Delete watchlist item
       await prisma.watchlistItem.deleteMany({
         where: {
-          watchlistId: watchlist.id,
+          watchlistId: targetWatchlistId,
           stockId: stockId,
         },
+      });
+
+      // Update the watchlist's updatedAt timestamp
+      await prisma.watchlist.update({
+        where: { id: targetWatchlistId },
+        data: { updatedAt: new Date() },
       });
 
       return res.status(200).json({ success: true });

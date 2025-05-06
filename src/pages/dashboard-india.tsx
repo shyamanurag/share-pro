@@ -109,6 +109,10 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [watchlistItems, setWatchlistItems] = useState<WatchlistItem[]>([]);
+  const [allWatchlists, setAllWatchlists] = useState<any[]>([]);
+  const [activeWatchlist, setActiveWatchlist] = useState<any>(null);
+  const [activeWatchlistId, setActiveWatchlistId] = useState<string>('');
+  const [watchlistCounts, setWatchlistCounts] = useState<Record<string, number>>({});
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -161,7 +165,28 @@ export default function Dashboard() {
       const response = await fetch('/api/watchlist');
       if (!response.ok) throw new Error('Failed to fetch watchlist');
       const data = await response.json();
+      
       setWatchlistItems(data.items);
+      setAllWatchlists(data.allWatchlists || []);
+      setActiveWatchlist(data.watchlist);
+      setActiveWatchlistId(data.watchlist?.id || '');
+      
+      // Calculate counts for each watchlist
+      const counts: Record<string, number> = {};
+      if (data.allWatchlists) {
+        // Initialize all watchlists with 0 count
+        data.allWatchlists.forEach((wl: any) => {
+          counts[wl.id] = 0;
+        });
+        
+        // Count items for the current watchlist
+        if (data.items) {
+          const currentWatchlistId = data.watchlist?.id;
+          counts[currentWatchlistId] = data.items.length;
+        }
+      }
+      setWatchlistCounts(counts);
+      
     } catch (error) {
       console.error('Error fetching watchlist:', error);
     }
@@ -231,17 +256,28 @@ export default function Dashboard() {
   const watchlistStockIds = watchlistItems.map(item => item.stockId);
 
   // Toggle watchlist
-  const toggleWatchlist = async (stockId: string) => {
+  const toggleWatchlist = async (stockId: string, watchlistId?: string) => {
     try {
+      const targetWatchlistId = watchlistId || activeWatchlistId;
+      
       if (watchlistStockIds.includes(stockId)) {
         // Remove from watchlist
-        const response = await fetch(`/api/watchlist/${stockId}`, {
+        const response = await fetch(`/api/watchlist/${stockId}?watchlistId=${targetWatchlistId}`, {
           method: 'DELETE',
         });
         
         if (!response.ok) throw new Error('Failed to remove from watchlist');
         
         setWatchlistItems(watchlistItems.filter(item => item.stockId !== stockId));
+        
+        // Update counts
+        if (targetWatchlistId && watchlistCounts[targetWatchlistId]) {
+          setWatchlistCounts({
+            ...watchlistCounts,
+            [targetWatchlistId]: Math.max(0, watchlistCounts[targetWatchlistId] - 1)
+          });
+        }
+        
         toast({
           title: "Removed from watchlist",
           description: "Stock removed from your watchlist",
@@ -253,13 +289,25 @@ export default function Dashboard() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ stockId }),
+          body: JSON.stringify({ 
+            stockId,
+            watchlistId: targetWatchlistId
+          }),
         });
         
         if (!response.ok) throw new Error('Failed to add to watchlist');
         
         const data = await response.json();
         setWatchlistItems([...watchlistItems, data.watchlistItem]);
+        
+        // Update counts
+        if (targetWatchlistId) {
+          setWatchlistCounts({
+            ...watchlistCounts,
+            [targetWatchlistId]: (watchlistCounts[targetWatchlistId] || 0) + 1
+          });
+        }
+        
         toast({
           title: "Added to watchlist",
           description: "Stock added to your watchlist",
@@ -1187,7 +1235,98 @@ export default function Dashboard() {
                 
                 <TabsContent value="watchlist" className="mt-4">
                   <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold">My Watchlist</h2>
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-xl font-bold">Watchlists</h2>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="flex items-center gap-1"
+                          >
+                            <Plus className="w-4 h-4" />
+                            New Watchlist
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>Create New Watchlist</DialogTitle>
+                            <DialogDescription>
+                              Enter a name for your new watchlist
+                            </DialogDescription>
+                          </DialogHeader>
+                          <form onSubmit={async (e) => {
+                            e.preventDefault();
+                            const formData = new FormData(e.currentTarget);
+                            const name = formData.get('watchlistName') as string;
+                            
+                            if (!name.trim()) {
+                              toast({
+                                variant: "destructive",
+                                title: "Error",
+                                description: "Watchlist name cannot be empty",
+                              });
+                              return;
+                            }
+                            
+                            try {
+                              const response = await fetch('/api/watchlists', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({ name }),
+                              });
+                              
+                              if (!response.ok) {
+                                const error = await response.json();
+                                throw new Error(error.error || 'Failed to create watchlist');
+                              }
+                              
+                              const data = await response.json();
+                              
+                              // Fetch all watchlists to update the dropdown
+                              fetchWatchlist();
+                              
+                              toast({
+                                title: "Watchlist Created",
+                                description: `"${name}" watchlist has been created`,
+                              });
+                              
+                              // Close the dialog
+                              document.getElementById('closeWatchlistDialog')?.click();
+                            } catch (error: any) {
+                              toast({
+                                variant: "destructive",
+                                title: "Error",
+                                description: error.message || "Failed to create watchlist",
+                              });
+                            }
+                          }}>
+                            <div className="grid gap-4 py-4">
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <label htmlFor="watchlistName" className="text-right text-sm font-medium col-span-1">
+                                  Name
+                                </label>
+                                <Input
+                                  id="watchlistName"
+                                  name="watchlistName"
+                                  placeholder="My Tech Stocks"
+                                  className="col-span-3"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button id="closeWatchlistDialog" type="button" variant="outline" className="hidden">
+                                Cancel
+                              </Button>
+                              <Button type="submit">Create Watchlist</Button>
+                            </DialogFooter>
+                          </form>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                     <Button 
                       variant="outline" 
                       size="sm" 
@@ -1198,6 +1337,209 @@ export default function Dashboard() {
                       <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                       Refresh
                     </Button>
+                  </div>
+                  
+                  {/* Watchlist selector */}
+                  <div className="mb-6">
+                    <select 
+                      className="w-full p-2 border rounded-md"
+                      value={activeWatchlistId}
+                      onChange={async (e) => {
+                        const newWatchlistId = e.target.value;
+                        setActiveWatchlistId(newWatchlistId);
+                        
+                        try {
+                          const response = await fetch(`/api/watchlist?watchlistId=${newWatchlistId}`);
+                          if (!response.ok) throw new Error('Failed to fetch watchlist');
+                          
+                          const data = await response.json();
+                          setWatchlistItems(data.items);
+                          setActiveWatchlist(data.watchlist);
+                        } catch (error) {
+                          console.error('Error fetching watchlist:', error);
+                          toast({
+                            variant: "destructive",
+                            title: "Error",
+                            description: "Failed to load watchlist",
+                          });
+                        }
+                      }}
+                    >
+                      {allWatchlists.map(watchlist => (
+                        <option key={watchlist.id} value={watchlist.id}>
+                          {watchlist.name} ({watchlistCounts[watchlist.id] || 0} stocks)
+                        </option>
+                      ))}
+                    </select>
+                    
+                    {activeWatchlist && (
+                      <div className="flex justify-between items-center mt-2">
+                        <div className="flex items-center gap-2">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-xs"
+                              >
+                                Rename
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-md">
+                              <DialogHeader>
+                                <DialogTitle>Rename Watchlist</DialogTitle>
+                                <DialogDescription>
+                                  Enter a new name for "{activeWatchlist.name}"
+                                </DialogDescription>
+                              </DialogHeader>
+                              <form onSubmit={async (e) => {
+                                e.preventDefault();
+                                const formData = new FormData(e.currentTarget);
+                                const name = formData.get('newWatchlistName') as string;
+                                
+                                if (!name.trim()) {
+                                  toast({
+                                    variant: "destructive",
+                                    title: "Error",
+                                    description: "Watchlist name cannot be empty",
+                                  });
+                                  return;
+                                }
+                                
+                                try {
+                                  const response = await fetch(`/api/watchlists/${activeWatchlist.id}`, {
+                                    method: 'PUT',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({ name }),
+                                  });
+                                  
+                                  if (!response.ok) {
+                                    const error = await response.json();
+                                    throw new Error(error.error || 'Failed to rename watchlist');
+                                  }
+                                  
+                                  // Fetch all watchlists to update the dropdown
+                                  fetchWatchlist();
+                                  
+                                  toast({
+                                    title: "Watchlist Renamed",
+                                    description: `Watchlist has been renamed to "${name}"`,
+                                  });
+                                  
+                                  // Close the dialog
+                                  document.getElementById('closeRenameDialog')?.click();
+                                } catch (error: any) {
+                                  toast({
+                                    variant: "destructive",
+                                    title: "Error",
+                                    description: error.message || "Failed to rename watchlist",
+                                  });
+                                }
+                              }}>
+                                <div className="grid gap-4 py-4">
+                                  <div className="grid grid-cols-4 items-center gap-4">
+                                    <label htmlFor="newWatchlistName" className="text-right text-sm font-medium col-span-1">
+                                      New Name
+                                    </label>
+                                    <Input
+                                      id="newWatchlistName"
+                                      name="newWatchlistName"
+                                      defaultValue={activeWatchlist.name}
+                                      className="col-span-3"
+                                      required
+                                    />
+                                  </div>
+                                </div>
+                                <DialogFooter>
+                                  <Button id="closeRenameDialog" type="button" variant="outline" className="hidden">
+                                    Cancel
+                                  </Button>
+                                  <Button type="submit">Rename Watchlist</Button>
+                                </DialogFooter>
+                              </form>
+                            </DialogContent>
+                          </Dialog>
+                          
+                          {allWatchlists.length > 1 && (
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="text-xs text-red-500 hover:text-red-700 hover:bg-red-100"
+                                >
+                                  Delete
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="sm:max-w-md">
+                                <DialogHeader>
+                                  <DialogTitle>Delete Watchlist</DialogTitle>
+                                  <DialogDescription>
+                                    Are you sure you want to delete "{activeWatchlist.name}"? This action cannot be undone.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="py-4">
+                                  <p className="text-sm text-muted-foreground">
+                                    All stocks in this watchlist will be removed. This action is permanent.
+                                  </p>
+                                </div>
+                                <DialogFooter>
+                                  <Button 
+                                    id="closeDeleteDialog" 
+                                    type="button" 
+                                    variant="outline"
+                                    onClick={() => {
+                                      document.getElementById('closeDeleteDialog')?.click();
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button 
+                                    variant="destructive"
+                                    onClick={async () => {
+                                      try {
+                                        const response = await fetch(`/api/watchlists/${activeWatchlist.id}`, {
+                                          method: 'DELETE',
+                                        });
+                                        
+                                        if (!response.ok) {
+                                          const error = await response.json();
+                                          throw new Error(error.error || 'Failed to delete watchlist');
+                                        }
+                                        
+                                        // Fetch all watchlists to update the dropdown
+                                        fetchWatchlist();
+                                        
+                                        toast({
+                                          title: "Watchlist Deleted",
+                                          description: `"${activeWatchlist.name}" has been deleted`,
+                                        });
+                                        
+                                        // Close the dialog
+                                        document.getElementById('closeDeleteDialog')?.click();
+                                      } catch (error: any) {
+                                        toast({
+                                          variant: "destructive",
+                                          title: "Error",
+                                          description: error.message || "Failed to delete watchlist",
+                                        });
+                                      }
+                                    }}
+                                  >
+                                    Delete Watchlist
+                                  </Button>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Created: {new Date(activeWatchlist.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    )}
                   </div>
                   
                   {watchlistItems.length > 0 ? (
@@ -1242,7 +1584,7 @@ export default function Dashboard() {
                                           variant="ghost" 
                                           size="icon" 
                                           className="h-8 w-8 relative"
-                                          onClick={() => toggleWatchlist(item.stockId)}
+                                          onClick={() => toggleWatchlist(item.stockId, activeWatchlistId)}
                                         >
                                           <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
                                         </Button>
@@ -1300,7 +1642,7 @@ export default function Dashboard() {
                   ) : (
                     <div className="text-center py-12 border border-dashed border-muted-foreground/20 rounded-lg">
                       <Star className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium mb-2">Your watchlist is empty</h3>
+                      <h3 className="text-lg font-medium mb-2">This watchlist is empty</h3>
                       <p className="text-muted-foreground mb-4">Add stocks to your watchlist by clicking the star icon</p>
                       <Button 
                         variant="outline" 

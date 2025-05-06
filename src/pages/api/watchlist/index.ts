@@ -13,18 +13,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // GET: Fetch user's watchlist with stock details
     if (req.method === 'GET') {
-      // Find or create default watchlist for user
-      let watchlist = await prisma.watchlist.findFirst({
-        where: { userId: user.id },
-      });
-
-      if (!watchlist) {
-        watchlist = await prisma.watchlist.create({
-          data: {
-            name: 'My Watchlist',
-            userId: user.id,
+      const { watchlistId } = req.query;
+      
+      // Find or create default watchlist for user if no watchlistId provided
+      let watchlist;
+      
+      if (watchlistId && typeof watchlistId === 'string') {
+        // Get specific watchlist
+        watchlist = await prisma.watchlist.findFirst({
+          where: { 
+            id: watchlistId,
+            userId: user.id 
           },
         });
+        
+        if (!watchlist) {
+          return res.status(404).json({ error: 'Watchlist not found' });
+        }
+      } else {
+        // Get or create default watchlist
+        watchlist = await prisma.watchlist.findFirst({
+          where: { userId: user.id },
+          orderBy: { updatedAt: 'desc' },
+        });
+
+        if (!watchlist) {
+          watchlist = await prisma.watchlist.create({
+            data: {
+              name: 'My Watchlist',
+              userId: user.id,
+            },
+          });
+        }
       }
 
       // Get watchlist items with stock details
@@ -33,32 +53,56 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         include: { stock: true },
       });
 
+      // Get all user's watchlists for the dropdown
+      const allWatchlists = await prisma.watchlist.findMany({
+        where: { userId: user.id },
+        orderBy: { updatedAt: 'desc' },
+      });
+
       return res.status(200).json({ 
         watchlist,
-        items: watchlistItems 
+        items: watchlistItems,
+        allWatchlists
       });
     }
     
     // POST: Add stock to watchlist
     else if (req.method === 'POST') {
-      const { stockId } = req.body;
+      const { stockId, watchlistId } = req.body;
       
       if (!stockId) {
         return res.status(400).json({ error: 'Stock ID is required' });
       }
 
-      // Find or create default watchlist for user
-      let watchlist = await prisma.watchlist.findFirst({
-        where: { userId: user.id },
-      });
-
-      if (!watchlist) {
-        watchlist = await prisma.watchlist.create({
-          data: {
-            name: 'My Watchlist',
-            userId: user.id,
+      // Find specified watchlist or default watchlist
+      let watchlist;
+      
+      if (watchlistId) {
+        watchlist = await prisma.watchlist.findFirst({
+          where: { 
+            id: watchlistId,
+            userId: user.id 
           },
         });
+        
+        if (!watchlist) {
+          return res.status(404).json({ error: 'Watchlist not found' });
+        }
+      } else {
+        // Find or create default watchlist
+        watchlist = await prisma.watchlist.findFirst({
+          where: { userId: user.id },
+          orderBy: { updatedAt: 'desc' },
+        });
+
+        if (!watchlist) {
+          watchlist = await prisma.watchlist.create({
+            data: {
+              name: 'My Watchlist',
+              userId: user.id,
+            },
+          });
+        }
       }
 
       // Check if stock already in watchlist
@@ -70,7 +114,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
 
       if (existingItem) {
-        return res.status(400).json({ error: 'Stock already in watchlist' });
+        return res.status(400).json({ error: 'Stock already in this watchlist' });
       }
 
       // Add stock to watchlist
@@ -80,6 +124,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           stockId: stockId,
         },
         include: { stock: true },
+      });
+
+      // Update the watchlist's updatedAt timestamp
+      await prisma.watchlist.update({
+        where: { id: watchlist.id },
+        data: { updatedAt: new Date() },
       });
 
       return res.status(201).json({ watchlistItem });
