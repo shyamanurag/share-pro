@@ -1,44 +1,59 @@
-const CACHE_NAME = 'tradepaper-india-v3';
+const CACHE_NAME = 'tradepaper-india-v4';
 const urlsToCache = [
   '/',
   '/dashboard',
   '/dashboard-india',
-  '/login',
-  '/signup',
   '/manifest.json',
   '/favicon.ico',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png'
 ];
 
+// List of paths that should never be cached
+const neverCachePaths = [
+  '/admin',
+  '/admin-login',
+  '/login',
+  '/signup',
+  '/magic-link-login',
+  '/reset-password',
+  '/forgot-password',
+  '/auth/',
+  '/api/',
+  '/_next/data/', // Next.js data requests
+  'supabase',
+  'auth'
+];
+
+// Check if a URL should be excluded from caching
+function shouldExcludeFromCache(url) {
+  const urlObj = new URL(url);
+  return neverCachePaths.some(path => urlObj.pathname.includes(path)) || 
+         urlObj.search.includes('t='); // URLs with timestamp parameter
+}
+
 self.addEventListener('install', (event) => {
+  console.log('[Service Worker] Installing new cache: ' + CACHE_NAME);
+  self.skipWaiting(); // Force activation
+  
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
+        console.log('[Service Worker] Caching app shell');
         return cache.addAll(urlsToCache);
       })
   );
 });
 
 self.addEventListener('fetch', (event) => {
-  // Skip caching for any authentication, admin, or API related URLs
-  if (
-    event.request.url.includes('/admin') ||
-    event.request.url.includes('/api/') ||
-    event.request.url.includes('/auth/') ||
-    event.request.url.includes('admin-login') ||
-    event.request.url.includes('/login') ||
-    event.request.url.includes('/signup') ||
-    event.request.url.includes('/magic-link-login') ||
-    event.request.url.includes('/reset-password') ||
-    event.request.url.includes('/forgot-password') ||
-    // Add additional auth-related paths
-    event.request.url.includes('supabase') ||
-    event.request.url.includes('auth') ||
-    // Skip caching for POST requests which are likely auth-related
-    event.request.method === 'POST'
-  ) {
-    // Use no-cache for these requests to ensure fresh responses
+  // Skip handling for non-GET requests
+  if (event.request.method !== 'GET') {
+    return;
+  }
+  
+  // Skip caching for authentication, admin, or API related URLs
+  if (shouldExcludeFromCache(event.request.url)) {
+    console.log('[Service Worker] Bypassing cache for:', event.request.url);
     return event.respondWith(
       fetch(event.request, { 
         cache: 'no-store',
@@ -47,6 +62,9 @@ self.addEventListener('fetch', (event) => {
           'Pragma': 'no-cache',
           'Expires': '0'
         }
+      }).catch(error => {
+        console.error('[Service Worker] Fetch error:', error);
+        throw error;
       })
     );
   }
@@ -59,25 +77,27 @@ self.addEventListener('fetch', (event) => {
         if (response) {
           return response;
         }
-        return fetch(event.request).then(
+        
+        // Clone the request - a request is a stream and can only be consumed once
+        const fetchRequest = event.request.clone();
+        
+        return fetch(fetchRequest).then(
           (response) => {
             // Check if we received a valid response
             if(!response || response.status !== 200 || response.type !== 'basic') {
               return response;
             }
 
-            // Clone the response
+            // Clone the response - a response is a stream and can only be consumed once
             const responseToCache = response.clone();
 
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                // Don't cache API requests or authentication endpoints
-                if (!event.request.url.includes('/api/') && 
-                    !event.request.url.includes('/auth/') &&
-                    !event.request.url.includes('/admin')) {
+            // Don't cache if URL should be excluded
+            if (!shouldExcludeFromCache(event.request.url)) {
+              caches.open(CACHE_NAME)
+                .then((cache) => {
                   cache.put(event.request, responseToCache);
-                }
-              });
+                });
+            }
 
             return response;
           }
@@ -87,16 +107,43 @@ self.addEventListener('fetch', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
+  console.log('[Service Worker] Activating new service worker');
+  
   const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
+            console.log('[Service Worker] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
+    }).then(() => {
+      console.log('[Service Worker] Claiming clients');
+      return self.clients.claim();
     })
   );
+});
+
+// Listen for messages from clients
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'CLEAR_CACHES') {
+    event.waitUntil(
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            console.log('[Service Worker] Deleting cache by request:', cacheName);
+            return caches.delete(cacheName);
+          })
+        );
+      }).then(() => {
+        console.log('[Service Worker] All caches cleared by request');
+        if (event.ports && event.ports[0]) {
+          event.ports[0].postMessage({ success: true });
+        }
+      })
+    );
+  }
 });

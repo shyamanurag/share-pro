@@ -121,7 +121,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('Successfully signed out before new sign in');
       
       // Wait a moment to ensure signout is complete
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 500));
     } catch (signOutError) {
       console.error('Error during pre-signin signout:', signOutError);
       // Continue anyway
@@ -130,67 +130,122 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Create a fresh Supabase client to avoid any cached state
     const freshSupabase = createClient();
     
+    // For admin users, ensure the admin user exists in the database
+    if (email.includes('admin')) {
+      try {
+        console.log('Admin login detected, ensuring admin user exists');
+        const timestamp = new Date().getTime();
+        const adminResponse = await fetch(`/api/demo/create-admin-user?t=${timestamp}`, {
+          method: 'POST',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          },
+        });
+        
+        if (!adminResponse.ok) {
+          const errorData = await adminResponse.json();
+          console.error('Error ensuring admin user exists:', errorData);
+        } else {
+          console.log('Admin user verified/created successfully');
+        }
+        
+        // Wait a moment to ensure the admin user is fully created
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (adminError) {
+        console.error('Error ensuring admin user exists:', adminError);
+        // Continue anyway
+      }
+    }
+    
     // Now attempt to sign in with the fresh client
     console.log('Calling supabase.auth.signInWithPassword');
-    const { data, error } = await freshSupabase.auth.signInWithPassword({ 
-      email, 
-      password,
-      options: {
-        // Don't use redirectTo for admin users, we'll handle that manually
-        redirectTo: email.includes('admin') ? undefined : `${window.location.origin}/dashboard-india`
-      }
-    });
+    let signInAttempts = 0;
+    const maxAttempts = 3;
+    let lastError = null;
     
-    if (error) {
-      console.error('Sign in error:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message,
-      });
-      throw error;
-    } 
-    
-    if (data.user) {
-      console.log('Sign in successful, user data:', data.user);
-      
-      // For admin users, ensure they have the admin role
-      if (email.includes('admin')) {
-        console.log('Admin user detected, updating metadata');
-        // Always update user metadata to include admin role
-        try {
-          await freshSupabase.auth.updateUser({
-            data: { role: 'ADMIN' }
+    while (signInAttempts < maxAttempts) {
+      try {
+        signInAttempts++;
+        console.log(`Sign in attempt ${signInAttempts} of ${maxAttempts}`);
+        
+        const { data, error } = await freshSupabase.auth.signInWithPassword({ 
+          email, 
+          password,
+          options: {
+            // Don't use redirectTo for admin users, we'll handle that manually
+            redirectTo: email.includes('admin') ? undefined : `${window.location.origin}/dashboard-india`
+          }
+        });
+        
+        if (error) {
+          console.error(`Sign in error (attempt ${signInAttempts}):`, error);
+          lastError = error;
+          
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          continue;
+        } 
+        
+        if (data.user) {
+          console.log('Sign in successful, user data:', data.user);
+          
+          // For admin users, ensure they have the admin role
+          if (email.includes('admin')) {
+            console.log('Admin user detected, updating metadata');
+            // Always update user metadata to include admin role
+            try {
+              await freshSupabase.auth.updateUser({
+                data: { role: 'ADMIN' }
+              });
+              console.log('Admin role set in user metadata');
+            } catch (updateError) {
+              console.error('Error updating user metadata:', updateError);
+              // Continue anyway
+            }
+          }
+          
+          console.log('Creating/updating user profile');
+          await createUser(data.user);
+          
+          // Refresh the user data after metadata update
+          const { data: refreshedData } = await freshSupabase.auth.getUser();
+          
+          toast({
+            title: "Success",
+            description: "You have successfully signed in",
           });
-          console.log('Admin role set in user metadata');
-        } catch (updateError) {
-          console.error('Error updating user metadata:', updateError);
-          // Continue anyway
+          
+          // Return the refreshed user data
+          return refreshedData?.user || data.user;
+        } else {
+          console.error('Sign in returned no user data');
+          lastError = new Error("No user data returned from authentication");
+          
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          continue;
         }
+      } catch (unexpectedError) {
+        console.error(`Unexpected error during sign in (attempt ${signInAttempts}):`, unexpectedError);
+        lastError = unexpectedError;
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
-      
-      console.log('Creating/updating user profile');
-      await createUser(data.user);
-      
-      // Refresh the user data after metadata update
-      const { data: refreshedData } = await freshSupabase.auth.getUser();
-      
-      toast({
-        title: "Success",
-        description: "You have successfully signed in",
-      });
-      
-      // Return the refreshed user data
-      return refreshedData?.user || data.user;
-    } else {
-      console.error('Sign in returned no user data');
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Authentication succeeded but no user data was returned",
-      });
-      throw new Error("No user data returned from authentication");
     }
+    
+    // If we get here, all attempts failed
+    console.error('All sign in attempts failed');
+    toast({
+      variant: "destructive",
+      title: "Error",
+      description: lastError instanceof Error 
+        ? lastError.message 
+        : "Failed to sign in after multiple attempts",
+    });
+    throw lastError || new Error("Failed to sign in after multiple attempts");
   };
 
   const signUp = async (email: string, password: string) => {

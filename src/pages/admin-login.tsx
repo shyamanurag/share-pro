@@ -67,8 +67,11 @@ const AdminLoginPage = () => {
         await Promise.all(cacheKeys.map(key => caches.delete(key)));
       }
       
+      // Add a timestamp to prevent caching
+      const timestamp = new Date().getTime();
+      
       // Ensure admin user exists
-      await fetch('/api/demo/create-admin-user', {
+      const adminResponse = await fetch(`/api/demo/create-admin-user?t=${timestamp}`, {
         method: 'POST',
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -77,17 +80,48 @@ const AdminLoginPage = () => {
         },
       });
       
-      // Sign in with admin credentials
-      await signIn('admin@papertrader.app', 'admin1234');
+      if (!adminResponse.ok) {
+        const errorData = await adminResponse.json();
+        console.error('Error creating admin user:', errorData);
+        throw new Error(`Failed to create admin user: ${errorData.error || 'Unknown error'}`);
+      }
       
-      // Use direct location change for more reliable navigation
-      window.location.href = '/admin';
+      // Wait a moment to ensure the admin user is fully created
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Sign in with admin credentials
+      try {
+        await signIn('admin@papertrader.app', 'admin1234');
+        console.log('Admin sign in successful');
+        
+        // Wait a moment to ensure the auth state is updated
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Use direct location change for more reliable navigation
+        window.location.href = '/admin';
+      } catch (signInError) {
+        console.error('Admin sign in error:', signInError);
+        
+        // If sign in fails, try one more time after a delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        try {
+          await signIn('admin@papertrader.app', 'admin1234');
+          console.log('Admin sign in successful on retry');
+          window.location.href = '/admin';
+        } catch (retryError) {
+          console.error('Admin sign in retry error:', retryError);
+          throw retryError;
+        }
+      }
     } catch (error) {
       console.error('Admin login error:', error);
       toast({
         variant: "destructive",
         title: "Login failed",
-        description: "Admin login failed. Please try again or clear your browser cache.",
+        description: error instanceof Error 
+          ? `Error: ${error.message}` 
+          : "Admin login failed. Please try again or clear your browser cache.",
       });
       setIsLoading(false);
     }
