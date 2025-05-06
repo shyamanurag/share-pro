@@ -1,8 +1,10 @@
 import type { AppProps } from 'next/app'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { TradeProvider } from '@/contexts/TradeContext'
 import '../styles/globals.css';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { Toaster } from "@/components/ui/toaster"
+import QuickTradeModal from '@/components/QuickTradeModal';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 
@@ -29,10 +31,13 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <div className="min-h-screen">
       <AuthProvider>
-        <ProtectedRoute>
-          <Component {...pageProps} />
-        </ProtectedRoute>
-        <Toaster />
+        <TradeProvider>
+          <ProtectedRoute>
+            <Component {...pageProps} />
+          </ProtectedRoute>
+          <QuickTradeModal />
+          <Toaster />
+        </TradeProvider>
       </AuthProvider>
     </div>
   )
