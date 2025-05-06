@@ -121,7 +121,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('Successfully signed out before new sign in');
       
       // Wait a moment to ensure signout is complete
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (signOutError) {
       console.error('Error during pre-signin signout:', signOutError);
       // Continue anyway
@@ -192,7 +192,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         signInAttempts++;
         console.log(`Sign in attempt ${signInAttempts} of ${maxAttempts}`);
         
-        const { data, error } = await freshSupabase.auth.signInWithPassword({ 
+        // Use a completely fresh client for each attempt
+        const attemptSupabase = createClient();
+        
+        const { data, error } = await attemptSupabase.auth.signInWithPassword({ 
           email, 
           password
         });
@@ -214,7 +217,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             console.log('Admin/demo user detected, updating metadata');
             // Always update user metadata to include admin role
             try {
-              await freshSupabase.auth.updateUser({
+              await attemptSupabase.auth.updateUser({
                 data: { role: 'ADMIN' }
               });
               console.log('Admin role set in user metadata');
@@ -222,6 +225,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               // Set admin flags in storage
               localStorage.setItem('adminUser', 'true');
               sessionStorage.setItem('adminUser', 'true');
+              sessionStorage.setItem('adminLoginAttempt', 'true');
+              sessionStorage.setItem('adminLoginTime', Date.now().toString());
             } catch (updateError) {
               console.error('Error updating user metadata:', updateError);
               // Continue anyway
@@ -232,7 +237,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           await createUser(data.user);
           
           // Refresh the user data after metadata update
-          const { data: refreshedData } = await freshSupabase.auth.getUser();
+          const { data: refreshedData } = await attemptSupabase.auth.getUser();
           
           toast({
             title: "Success",

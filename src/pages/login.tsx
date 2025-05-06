@@ -124,6 +124,38 @@ const LoginPage = () => {
         }
       }
       
+      // For admin user, ensure it exists first
+      if (email === 'admin@papertrader.app') {
+        try {
+          console.log('Creating/verifying admin user before login');
+          const timestamp = new Date().getTime(); // Add timestamp to prevent caching
+          const response = await fetch(`/api/demo/create-admin-user?t=${timestamp}`, {
+            method: 'POST',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0'
+            },
+          });
+          
+          const data = await response.json();
+          console.log('Admin user setup response:', data);
+          
+          if (!response.ok) {
+            throw new Error(data.error || 'Failed to set up admin user');
+          }
+        } catch (adminError) {
+          console.error('Error setting up admin user:', adminError);
+          toast({
+            variant: "destructive",
+            title: "Admin Setup Error",
+            description: "There was an error setting up the admin account. Please try again.",
+          });
+          setIsLoading(false);
+          return;
+        }
+      }
+      
       // Sign out first to ensure clean state
       try {
         const supabase = createClient();
@@ -135,46 +167,19 @@ const LoginPage = () => {
       }
       
       // Wait a moment to ensure signout is complete
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Create a fresh Supabase client to avoid any cached state
-      const freshSupabase = createClient();
-      
-      // Try direct login with Supabase first
+      // Use AuthContext's signIn method which handles both demo and admin users
       try {
-        console.log('Attempting direct login with Supabase');
-        const { data, error } = await freshSupabase.auth.signInWithPassword({
-          email,
-          password
-        });
-        
-        if (error) {
-          console.error('Direct Supabase login error:', error);
-          throw error;
-        }
-        
-        if (data.user) {
-          console.log('Direct login successful, user:', data.user);
-          
-          // If this is the demo user, set admin flag for admin access
-          if (email === 'demo@papertrader.app') {
-            localStorage.setItem('adminUser', 'true');
-            sessionStorage.setItem('adminUser', 'true');
-          }
-          
-          // Use direct location change for more reliable navigation
-          window.location.href = '/dashboard-india';
-          return;
-        }
-      } catch (directLoginError) {
-        console.error('Direct login attempt failed:', directLoginError);
-        // Continue to try with AuthContext signIn
-      }
-      
-      // Attempt sign in through AuthContext
-      try {
+        console.log('Using AuthContext signIn method');
         await signIn(email, password);
         console.log('Login successful, redirecting to dashboard');
+        
+        // Set admin flag if needed
+        if (email === 'demo@papertrader.app' || email === 'admin@papertrader.app') {
+          localStorage.setItem('adminUser', 'true');
+          sessionStorage.setItem('adminUser', 'true');
+        }
         
         // Use direct location change for more reliable navigation
         window.location.href = '/dashboard-india';

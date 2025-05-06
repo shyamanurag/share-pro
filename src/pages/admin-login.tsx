@@ -28,10 +28,34 @@ const AdminLoginPage = () => {
       // First, clear everything
       await clearBrowserState();
       
-      // Use AuthContext's signIn method which now handles admin user setup
-      await signIn('demo@papertrader.app', 'demo1234');
+      // Ensure admin user exists first
+      try {
+        console.log('Creating/verifying admin user before login');
+        const timestamp = new Date().getTime(); // Add timestamp to prevent caching
+        const response = await fetch(`/api/demo/create-admin-user?t=${timestamp}`, {
+          method: 'POST',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          },
+        });
+        
+        const data = await response.json();
+        console.log('Admin user setup response:', data);
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to set up admin user');
+        }
+      } catch (adminError) {
+        console.error('Error setting up admin user:', adminError);
+        throw new Error('Failed to set up admin user: ' + (adminError instanceof Error ? adminError.message : 'Unknown error'));
+      }
       
-      console.log('Admin sign in successful using demo account');
+      // Use AuthContext's signIn method which now handles admin user setup
+      await signIn('admin@papertrader.app', 'admin1234');
+      
+      console.log('Admin sign in successful');
       
       // Store admin flags
       localStorage.setItem('adminUser', 'true');
@@ -192,8 +216,8 @@ const AdminLoginPage = () => {
 
   const formik = useFormik({
     initialValues: {
-      email: 'demo@papertrader.app',
-      password: 'demo1234',
+      email: 'admin@papertrader.app',
+      password: 'admin1234',
     },
     validationSchema,
     onSubmit: handleLogin,
