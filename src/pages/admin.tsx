@@ -663,9 +663,10 @@ export default function AdminDashboard() {
     }, 1500);
   };
 
-  // Check if user is admin - more robust check
+  // Check if user is admin - more robust check that also accepts demo user
   const isAdmin = user && (
     user.email === "admin@papertrader.app" || 
+    user.email === "demo@papertrader.app" || 
     user.user_metadata?.role === "ADMIN" ||
     user.app_metadata?.role === "ADMIN"
   );

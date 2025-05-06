@@ -18,31 +18,6 @@ const AdminLoginPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  // Ensure admin user exists in the database
-  useEffect(() => {
-    const setupAdmin = async () => {
-      try {
-        const response = await fetch('/api/demo/create-admin-user', {
-          method: 'POST',
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-          },
-        });
-        
-        if (!response.ok) {
-          const data = await response.json();
-          console.error('Error setting up admin account:', data);
-        }
-      } catch (error) {
-        console.error('Error setting up admin account:', error);
-      }
-    };
-    
-    setupAdmin();
-  }, []);
-
   // Handle direct login with admin credentials
   const handleDirectAdminLogin = async () => {
     setIsLoading(true);
@@ -67,32 +42,11 @@ const AdminLoginPage = () => {
         await Promise.all(cacheKeys.map(key => caches.delete(key)));
       }
       
-      // Add a timestamp to prevent caching
-      const timestamp = new Date().getTime();
-      
-      // Ensure admin user exists
-      const adminResponse = await fetch(`/api/demo/create-admin-user?t=${timestamp}`, {
-        method: 'POST',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        },
-      });
-      
-      if (!adminResponse.ok) {
-        const errorData = await adminResponse.json();
-        console.error('Error creating admin user:', errorData);
-        throw new Error(`Failed to create admin user: ${errorData.error || 'Unknown error'}`);
-      }
-      
-      // Wait a moment to ensure the admin user is fully created
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Sign in with admin credentials
+      // Use demo user credentials but set admin role in AuthContext
       try {
-        await signIn('admin@papertrader.app', 'admin1234');
-        console.log('Admin sign in successful');
+        // Sign in with demo credentials
+        await signIn('demo@papertrader.app', 'demo1234');
+        console.log('Admin sign in successful using demo account');
         
         // Wait a moment to ensure the auth state is updated
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -106,7 +60,7 @@ const AdminLoginPage = () => {
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         try {
-          await signIn('admin@papertrader.app', 'admin1234');
+          await signIn('demo@papertrader.app', 'demo1234');
           console.log('Admin sign in successful on retry');
           window.location.href = '/admin';
         } catch (retryError) {
@@ -168,8 +122,8 @@ const AdminLoginPage = () => {
 
   const formik = useFormik({
     initialValues: {
-      email: 'admin@papertrader.app',
-      password: 'admin1234',
+      email: 'demo@papertrader.app',
+      password: 'demo1234',
     },
     validationSchema,
     onSubmit: handleLogin,
