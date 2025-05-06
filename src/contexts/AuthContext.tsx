@@ -130,33 +130,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Create a fresh Supabase client to avoid any cached state
     const freshSupabase = createClient();
     
-    // For admin users, ensure the admin user exists in the database
+    // Skip admin user creation API call as it's failing with permission issues
+    // Instead, we'll rely on the admin check in the admin.tsx page
     if (email.includes('admin')) {
-      try {
-        console.log('Admin login detected, ensuring admin user exists');
-        const timestamp = new Date().getTime();
-        const adminResponse = await fetch(`/api/demo/create-admin-user?t=${timestamp}`, {
-          method: 'POST',
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-          },
-        });
-        
-        if (!adminResponse.ok) {
-          const errorData = await adminResponse.json();
-          console.error('Error ensuring admin user exists:', errorData);
-        } else {
-          console.log('Admin user verified/created successfully');
-        }
-        
-        // Wait a moment to ensure the admin user is fully created
-        await new Promise(resolve => setTimeout(resolve, 500));
-      } catch (adminError) {
-        console.error('Error ensuring admin user exists:', adminError);
-        // Continue anyway
-      }
+      console.log('Admin login detected, skipping admin user creation API call');
+      // Wait a moment to ensure clean state
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
     
     // Now attempt to sign in with the fresh client

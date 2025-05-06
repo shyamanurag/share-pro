@@ -113,19 +113,28 @@ async function initializeServiceWorker() {
   } else {
     // For non-admin pages, register or update the service worker
     try {
-      const registration = await navigator.serviceWorker.register('/sw.js', {
-        updateViaCache: 'none', // Don't use cached versions of the service worker
-        scope: '/'
-      });
+      // Check if service worker is already registered
+      const existingRegistration = await navigator.serviceWorker.getRegistration();
       
-      // Force update on each page load
-      await registration.update();
-      console.log('ServiceWorker registration successful with scope:', registration.scope);
+      if (existingRegistration) {
+        // If already registered, just update it
+        await existingRegistration.update();
+        console.log('Existing ServiceWorker updated');
+      } else {
+        // Otherwise register a new one
+        const registration = await navigator.serviceWorker.register('/sw.js', {
+          updateViaCache: 'none', // Don't use cached versions of the service worker
+          scope: '/'
+        });
+        console.log('ServiceWorker registration successful with scope:', registration.scope);
+      }
       
       // Clear auth storage anyway to be safe
       clearAuthStorage();
     } catch (error) {
       console.error('ServiceWorker registration failed:', error);
+      // Continue without service worker
+      clearAuthStorage();
     }
   }
 }

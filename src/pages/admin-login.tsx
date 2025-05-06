@@ -3,6 +3,7 @@ import React, { useContext, useState, useEffect } from 'react';
 import * as Yup from 'yup';
 import { useRouter } from 'next/router';
 import { AuthContext } from '@/contexts/AuthContext';
+import { createClient } from '@/util/supabase/component';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import Logo from '@/components/Logo';
 import { useToast } from "@/components/ui/use-toast";
