@@ -43,6 +43,8 @@ const AdminLoginPage = () => {
         await Promise.all(cacheKeys.map(key => caches.delete(key)));
       }
       
+      console.log('Starting one-click admin login process');
+      
       // Use demo user credentials but set admin role in AuthContext
       try {
         // Sign in with demo credentials
@@ -50,10 +52,17 @@ const AdminLoginPage = () => {
         console.log('Admin sign in successful using demo account');
         
         // Wait a moment to ensure the auth state is updated
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Use direct location change for more reliable navigation
-        window.location.href = '/admin';
+        // Force a hard redirect to the admin page
+        console.log('Redirecting to admin page');
+        router.push('/admin');
+        
+        // As a fallback, also use direct location change after a short delay
+        setTimeout(() => {
+          console.log('Fallback: Using direct location change to admin page');
+          window.location.href = '/admin';
+        }, 1500);
       } catch (signInError) {
         console.error('Admin sign in error:', signInError);
         
@@ -63,7 +72,19 @@ const AdminLoginPage = () => {
         try {
           await signIn('demo@papertrader.app', 'demo1234');
           console.log('Admin sign in successful on retry');
-          window.location.href = '/admin';
+          
+          // Wait a moment to ensure the auth state is updated
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Force a hard redirect to the admin page
+          console.log('Redirecting to admin page after retry');
+          router.push('/admin');
+          
+          // As a fallback, also use direct location change after a short delay
+          setTimeout(() => {
+            console.log('Fallback: Using direct location change to admin page after retry');
+            window.location.href = '/admin';
+          }, 1500);
         } catch (retryError) {
           console.error('Admin sign in retry error:', retryError);
           throw retryError;
