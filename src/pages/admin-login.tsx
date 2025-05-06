@@ -19,7 +19,7 @@ const AdminLoginPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  // Handle direct login with admin credentials - simplified approach
+  // Handle direct login with admin credentials - using AuthContext
   const handleDirectAdminLogin = async () => {
     setIsLoading(true);
     try {
@@ -28,65 +28,27 @@ const AdminLoginPage = () => {
       // First, clear everything
       await clearBrowserState();
       
-      // Create a completely fresh Supabase client
-      const freshSupabase = createClient();
+      // Use AuthContext's signIn method which now handles admin user setup
+      await signIn('demo@papertrader.app', 'demo1234');
       
-      // Sign in with demo credentials directly
-      console.log('Attempting to sign in with demo@papertrader.app');
+      console.log('Admin sign in successful using demo account');
       
-      // First ensure the demo user exists via API
-      const demoResponse = await fetch('/api/demo/create-demo-user', {
-        method: 'POST',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        },
+      // Store admin flags
+      localStorage.setItem('adminUser', 'true');
+      sessionStorage.setItem('adminUser', 'true');
+      sessionStorage.setItem('adminLoginAttempt', 'true');
+      sessionStorage.setItem('adminLoginTime', Date.now().toString());
+      
+      toast({
+        title: "Admin Access",
+        description: "Login successful. Redirecting to admin panel...",
       });
       
-      if (!demoResponse.ok) {
-        const errorData = await demoResponse.json();
-        throw new Error(`Failed to create demo user: ${errorData.error}`);
-      }
+      // Wait a moment to ensure storage is set
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Sign in directly with Supabase client
-      const { data, error } = await freshSupabase.auth.signInWithPassword({
-        email: 'demo@papertrader.app',
-        password: 'demo1234'
-      });
-      
-      if (error) {
-        console.error('Sign in error:', error);
-        throw error;
-      }
-      
-      if (data.user) {
-        console.log('Admin sign in successful using demo account');
-        
-        // Set admin role in user metadata
-        await freshSupabase.auth.updateUser({
-          data: { role: 'ADMIN' }
-        });
-        
-        // Store admin flags
-        localStorage.setItem('adminUser', 'true');
-        sessionStorage.setItem('adminUser', 'true');
-        sessionStorage.setItem('adminLoginAttempt', 'true');
-        sessionStorage.setItem('adminLoginTime', Date.now().toString());
-        
-        toast({
-          title: "Admin Access",
-          description: "Login successful. Redirecting to admin panel...",
-        });
-        
-        // Wait a moment to ensure storage is set
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Force a hard redirect to the admin page
-        window.location.href = '/admin';
-      } else {
-        throw new Error('No user data returned from authentication');
-      }
+      // Force a hard redirect to the admin page
+      window.location.href = '/admin';
     } catch (error) {
       console.error('Admin login error:', error);
       toast({
@@ -185,81 +147,28 @@ const AdminLoginPage = () => {
       // Clear everything first
       await clearBrowserState();
       
-      // If this is the admin user, ensure it exists first
-      if (email === 'admin@papertrader.app') {
-        try {
-          console.log('Creating/verifying admin user before login');
-          const response = await fetch('/api/demo/create-admin-user', {
-            method: 'POST',
-            headers: {
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache',
-              'Expires': '0'
-            },
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to set up admin user');
-          }
-          
-          console.log('Admin user setup successful');
-        } catch (adminError) {
-          console.error('Error setting up admin user:', adminError);
-          // Continue anyway, as the login might still work
-        }
-      }
+      // Use AuthContext's signIn method which now handles admin user setup
+      await signIn(email, password);
       
-      // Create a completely fresh Supabase client
-      const freshSupabase = createClient();
+      console.log('Sign in successful');
       
-      console.log(`Attempting to sign in with email: ${email}`);
+      // Store admin flags in both localStorage and sessionStorage for redundancy
+      localStorage.setItem('adminUser', 'true');
+      sessionStorage.setItem('adminUser', 'true');
+      sessionStorage.setItem('adminLoginAttempt', 'true');
+      sessionStorage.setItem('adminLoginTime', Date.now().toString());
       
-      // Sign in directly with Supabase client
-      const { data, error } = await freshSupabase.auth.signInWithPassword({
-        email,
-        password
+      toast({
+        title: "Login Successful",
+        description: "Redirecting to admin panel...",
       });
       
-      if (error) {
-        console.error('Sign in error:', error);
-        throw error;
-      }
+      // Wait to ensure auth state is updated
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      if (data.user) {
-        console.log('Sign in successful, user data:', data.user);
-        
-        // For admin users, ensure they have the admin role
-        if (email.includes('admin') || email === 'demo@papertrader.app') {
-          console.log('Admin user detected, updating metadata');
-          
-          const updateResult = await freshSupabase.auth.updateUser({
-            data: { role: 'ADMIN' }
-          });
-          
-          console.log('Metadata update result:', updateResult);
-        }
-        
-        // Store admin flags in both localStorage and sessionStorage for redundancy
-        localStorage.setItem('adminUser', 'true');
-        sessionStorage.setItem('adminUser', 'true');
-        sessionStorage.setItem('adminLoginAttempt', 'true');
-        sessionStorage.setItem('adminLoginTime', Date.now().toString());
-        
-        toast({
-          title: "Login Successful",
-          description: "Redirecting to admin panel...",
-        });
-        
-        // Wait to ensure auth state is updated
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Use direct location change for more reliable navigation
-        console.log('Redirecting to admin page');
-        window.location.href = '/admin';
-      } else {
-        throw new Error('No user data returned from authentication');
-      }
+      // Use direct location change for more reliable navigation
+      console.log('Redirecting to admin page');
+      window.location.href = '/admin';
     } catch (error) {
       console.error('Login error:', error);
       toast({

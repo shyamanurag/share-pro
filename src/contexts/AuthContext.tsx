@@ -154,6 +154,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.error('Error setting up demo user:', demoError);
         throw new Error('Failed to set up demo user: ' + (demoError instanceof Error ? demoError.message : 'Unknown error'));
       }
+    } 
+    // If this is the admin user, ensure it exists first
+    else if (email === 'admin@papertrader.app') {
+      try {
+        console.log('Creating/verifying admin user before login');
+        const timestamp = new Date().getTime(); // Add timestamp to prevent caching
+        const response = await fetch(`/api/demo/create-admin-user?t=${timestamp}`, {
+          method: 'POST',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          },
+        });
+        
+        const data = await response.json();
+        console.log('Admin user setup response:', data);
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to set up admin user');
+        }
+      } catch (adminError) {
+        console.error('Error setting up admin user:', adminError);
+        throw new Error('Failed to set up admin user: ' + (adminError instanceof Error ? adminError.message : 'Unknown error'));
+      }
     }
     
     // Now attempt to sign in with the fresh client

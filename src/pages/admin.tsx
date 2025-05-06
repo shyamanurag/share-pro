@@ -215,36 +215,12 @@ export default function AdminDashboard() {
     totalExposure: 750000
   });
 
-  // Create admin user if needed and fetch admin dashboard data
+  // Fetch admin dashboard data
   useEffect(() => {
-    const setupAdmin = async () => {
-      try {
-        // Ensure admin user exists
-        const response = await fetch('/api/demo/create-admin-user', {
-          method: 'POST',
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('Error setting up admin account:', errorData);
-          toast({
-            variant: "destructive",
-            title: "Admin Setup Error",
-            description: "There was an error setting up the admin account.",
-          });
-        }
-      } catch (error) {
-        console.error('Error setting up admin account:', error);
-      }
-    };
-
     if (user) {
       setIsLoading(true);
       
-      // Only attempt to setup admin if the current user is an admin
-      if (user.email === "admin@papertrader.app") {
-        setupAdmin();
-      }
+      // Admin user setup is now handled in AuthContext.signIn
       
       // Mock users data for demo
       const mockUsers: UserProfile[] = [
