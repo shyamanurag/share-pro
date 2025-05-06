@@ -4,8 +4,21 @@ import { User, Provider } from '@supabase/supabase-js';
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from 'next/router';
 
+interface UserProfile {
+  id: string;
+  email: string;
+  name: string | null;
+  avatarUrl: string | null;
+  balance: number;
+  role?: string;
+  isActive?: boolean;
+  lastLogin?: string;
+}
+
 interface AuthContextType {
   user: User | null;
+  userProfile: UserProfile | null;
+  isAdmin: boolean;
   createUser: (user: User) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
@@ -14,10 +27,13 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   initializing: boolean;
+  refreshUserProfile: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType>({
   user: null,
+  userProfile: null,
+  isAdmin: false,
   createUser: async () => {},
   signIn: async () => {},
   signUp: async () => {},
@@ -25,20 +41,67 @@ export const AuthContext = createContext<AuthContextType>({
   signInWithGoogle: async () => {},
   signOut: async () => {},
   resetPassword: async () => {},
-  initializing: false
+  initializing: false,
+  refreshUserProfile: async () => {}
 });
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const supabase = createClient();
   const { toast } = useToast();
+
+  // Function to fetch user profile from database
+  const refreshUserProfile = async () => {
+    if (!user) {
+      setUserProfile(null);
+      setIsAdmin(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('User')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        return;
+      }
+
+      setUserProfile(data);
+      
+      // Check if user is admin
+      const isAdminUser = 
+        data?.role === 'ADMIN' || 
+        user.email?.includes('admin') || 
+        user.email === 'demo@papertrader.app' ||
+        user.user_metadata?.role === 'ADMIN';
+      
+      setIsAdmin(isAdminUser);
+      
+      if (isAdminUser) {
+        localStorage.setItem('adminUser', 'true');
+      }
+    } catch (error) {
+      console.error('Error in refreshUserProfile:', error);
+    }
+  };
 
   React.useEffect(() => {
     const fetchSession = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+      
+      if (user) {
+        await refreshUserProfile();
+      }
+      
       setInitializing(false);
     };
 
@@ -47,7 +110,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       // The setTimeout is necessary to allow Supabase functions to trigger inside onAuthStateChange
       setTimeout(async () => {
-        setUser(session?.user ?? null);
+        const newUser = session?.user ?? null;
+        setUser(newUser);
+        
+        if (newUser) {
+          await refreshUserProfile();
+        } else {
+          setUserProfile(null);
+          setIsAdmin(false);
+        }
+        
         setInitializing(false);
       }, 0);
     });
@@ -383,6 +455,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   return (
     <AuthContext.Provider value={{
       user,
+      userProfile,
+      isAdmin,
       createUser,
       signIn,
       signUp,
@@ -391,7 +465,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       signOut,
       resetPassword,
       initializing,
-
+      refreshUserProfile
     }}>
       {children}
     </AuthContext.Provider>

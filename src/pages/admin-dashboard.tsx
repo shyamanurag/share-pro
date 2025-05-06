@@ -225,25 +225,46 @@ export default function AdminDashboard() {
   }, []);
 
   // Handle admin login
-  const handleAdminLogin = () => {
+  const handleAdminLogin = async () => {
     setIsLoading(true);
     
-    // Simple authentication with hardcoded password
-    // In a production environment, this should be replaced with a secure authentication method
-    setTimeout(() => {
-      if (adminPassword === 'admin1234') {
+    try {
+      // Authenticate against the database
+      const response = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: 'admin@papertrader.app',
+          password: adminPassword
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
         localStorage.setItem('adminDashboardAuth', 'true');
+        localStorage.setItem('adminUserId', data.userId);
         setIsAuthenticated(true);
         fetchAdminData();
       } else {
         toast({
           variant: "destructive",
           title: "Authentication Failed",
-          description: "Invalid admin password. Please try again.",
+          description: data.error || "Invalid admin password. Please try again.",
         });
       }
+    } catch (error) {
+      console.error('Login error:', error);
+      toast({
+        variant: "destructive",
+        title: "Authentication Failed",
+        description: "An error occurred during login. Please try again.",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   // Handle admin logout

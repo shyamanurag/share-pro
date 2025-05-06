@@ -310,7 +310,32 @@ export default function AdvancedTrading() {
 
   // Execute futures trade
   const executeFuturesTrade = async () => {
-    if (!selectedStock || !futuresState.selectedContractId) return;
+    if (!selectedStock) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select a stock first",
+      });
+      return;
+    }
+    
+    if (!futuresState.selectedContractId) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select a futures contract",
+      });
+      return;
+    }
+    
+    if (futuresState.quantity <= 0) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Quantity must be greater than zero",
+      });
+      return;
+    }
     
     try {
       setIsLoading(true);
@@ -327,17 +352,23 @@ export default function AdvancedTrading() {
         }),
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to execute futures trade');
-      }
-      
       const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to execute futures trade');
+      }
       
       toast({
         title: "Futures Trade Executed",
         description: data.message,
       });
+      
+      // Reset quantity after successful trade
+      setFuturesState(prev => ({
+        ...prev,
+        quantity: 1
+      }));
+      
     } catch (error: any) {
       console.error('Error executing futures trade:', error);
       toast({
@@ -352,7 +383,32 @@ export default function AdvancedTrading() {
 
   // Execute options trade
   const executeOptionsTrade = async () => {
-    if (!selectedStock || !optionsState.selectedContractId) return;
+    if (!selectedStock) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select a stock first",
+      });
+      return;
+    }
+    
+    if (!optionsState.selectedContractId) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select an options contract",
+      });
+      return;
+    }
+    
+    if (optionsState.quantity <= 0) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Quantity must be greater than zero",
+      });
+      return;
+    }
     
     try {
       setIsLoading(true);
@@ -369,17 +425,23 @@ export default function AdvancedTrading() {
         }),
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to execute options trade');
-      }
-      
       const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to execute options trade');
+      }
       
       toast({
         title: "Options Trade Executed",
         description: data.message,
       });
+      
+      // Reset quantity after successful trade
+      setOptionsState(prev => ({
+        ...prev,
+        quantity: 1
+      }));
+      
     } catch (error: any) {
       console.error('Error executing options trade:', error);
       toast({

@@ -18,6 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const currentDate = new Date();
       
       // Fetch futures contracts for the stock that haven't expired
+      // Using proper column names with quotes for Prisma raw queries
       const futuresContracts = await prisma.$queryRaw`
         SELECT 
           fc.id, 
