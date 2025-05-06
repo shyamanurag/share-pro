@@ -1,7 +1,7 @@
 import { useFormik } from 'formik';
-import React, { useContext, useState, useEffect, useCallback } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import * as Yup from 'yup';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { AuthContext } from '@/contexts/AuthContext';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import Logo from '@/components/Logo';
@@ -10,26 +10,143 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
-import { useIsIFrame } from '@/hooks/useIsIFrame';
-import { createClient } from '@/util/supabase/component';
 
 const AdminLoginPage = () => {
   const router = useRouter();
-  const { initializing, signIn } = useContext(AuthContext);
+  const { signIn } = useContext(AuthContext);
   const [showPw, setShowPw] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { isIframe } = useIsIFrame();
   const { toast } = useToast();
-  const [isClearingCache, setIsClearingCache] = useState(false);
 
-  // Function to clear cache and service workers
-  const clearCacheAndServiceWorkers = useCallback(async () => {
-    setIsClearingCache(true);
+  // Ensure admin user exists in the database
+  useEffect(() => {
+    const setupAdmin = async () => {
+      try {
+        const response = await fetch('/api/demo/create-admin-user', {
+          method: 'POST',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          },
+        });
+        
+        if (!response.ok) {
+          const data = await response.json();
+          console.error('Error setting up admin account:', data);
+        }
+      } catch (error) {
+        console.error('Error setting up admin account:', error);
+      }
+    };
+    
+    setupAdmin();
+  }, []);
+
+  // Handle direct login with admin credentials
+  const handleDirectAdminLogin = async () => {
+    setIsLoading(true);
     try {
-      // Clear localStorage
-      localStorage.clear();
+      // Clear any existing auth state
+      if (typeof window !== 'undefined') {
+        localStorage.clear();
+        sessionStorage.clear();
+      }
       
-      // Clear sessionStorage
+      // Unregister service workers if they exist
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const registration of registrations) {
+          await registration.unregister();
+        }
+      }
+      
+      // Clear caches
+      if ('caches' in window) {
+        const cacheKeys = await caches.keys();
+        await Promise.all(cacheKeys.map(key => caches.delete(key)));
+      }
+      
+      // Ensure admin user exists
+      await fetch('/api/demo/create-admin-user', {
+        method: 'POST',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+      });
+      
+      // Sign in with admin credentials
+      await signIn('admin@papertrader.app', 'admin1234');
+      
+      // Use direct location change for more reliable navigation
+      window.location.href = '/admin';
+    } catch (error) {
+      console.error('Admin login error:', error);
+      toast({
+        variant: "destructive",
+        title: "Login failed",
+        description: "Admin login failed. Please try again or clear your browser cache.",
+      });
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    
+    try {
+      const { email, password } = formik.values;
+      
+      // Clear any existing auth state
+      if (typeof window !== 'undefined') {
+        localStorage.clear();
+        sessionStorage.clear();
+      }
+      
+      // Sign in with provided credentials
+      await signIn(email, password);
+      
+      // Use direct location change for more reliable navigation
+      window.location.href = '/admin';
+    } catch (error) {
+      console.error('Login error:', error);
+      toast({
+        variant: "destructive",
+        title: "Login failed",
+        description: error instanceof Error 
+          ? `Error: ${error.message}` 
+          : "Please check your credentials and try again.",
+      });
+      setIsLoading(false);
+    }
+  };
+
+  const validationSchema = Yup.object().shape({
+    email: Yup.string().required("Email is required").email("Email is invalid"),
+    password: Yup.string()
+      .required("Password is required")
+      .min(4, "Must be at least 4 characters")
+      .max(40, "Must not exceed 40 characters"),
+  });
+
+  const formik = useFormik({
+    initialValues: {
+      email: 'admin@papertrader.app',
+      password: 'admin1234',
+    },
+    validationSchema,
+    onSubmit: handleLogin,
+  });
+
+  // Clear cache and service workers
+  const clearCache = async () => {
+    setIsLoading(true);
+    try {
+      // Clear localStorage and sessionStorage
+      localStorage.clear();
       sessionStorage.clear();
       
       // Unregister service workers
@@ -58,187 +175,7 @@ const AdminLoginPage = () => {
         description: "Failed to clear cache. Please try refreshing the page.",
       });
     } finally {
-      setIsClearingCache(false);
-    }
-  }, [toast]);
-
-  // Clear any existing auth state on component mount
-  useEffect(() => {
-    const clearAuthState = async () => {
-      try {
-        // Clear any cached credentials from localStorage
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('supabase.auth.token');
-          
-          // Clear service worker cache if possible
-          if ('caches' in window) {
-            try {
-              const cacheKeys = await caches.keys();
-              for (const key of cacheKeys) {
-                await caches.delete(key);
-              }
-              console.log('Cache cleared successfully');
-            } catch (cacheError) {
-              console.error('Error clearing cache:', cacheError);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error clearing auth state:', error);
-      }
-    };
-    
-    clearAuthState();
-  }, []);
-
-  // Ensure admin user exists in the database
-  useEffect(() => {
-    const setupAdmin = async () => {
-      setIsLoading(true);
-      try {
-        console.log('Setting up admin account...');
-        const response = await fetch('/api/demo/create-admin-user', {
-          method: 'POST',
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-          },
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-          console.error('Error setting up admin account:', data);
-          toast({
-            variant: "destructive",
-            title: "Setup Error",
-            description: data.error || "There was an error setting up the admin account. Please try again.",
-          });
-        } else {
-          console.log('Admin account setup successful:', data);
-        }
-      } catch (error) {
-        console.error('Error setting up admin account:', error);
-        toast({
-          variant: "destructive",
-          title: "Connection Error",
-          description: "Could not connect to the server. Please check your connection and try again.",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    setupAdmin();
-  }, [toast]);
-
-  const handleLogin = async (e: any) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      // Clear any existing auth state first
-      if (typeof window !== 'undefined') {
-        console.log('Clearing browser storage and cache');
-        localStorage.clear();
-        sessionStorage.clear();
-        
-        // Unregister service workers
-        if ('serviceWorker' in navigator) {
-          const registrations = await navigator.serviceWorker.getRegistrations();
-          for (const registration of registrations) {
-            await registration.unregister();
-          }
-        }
-        
-        // Clear caches
-        if ('caches' in window) {
-          const cacheKeys = await caches.keys();
-          await Promise.all(cacheKeys.map(key => caches.delete(key)));
-        }
-      }
-      
-      const { email, password } = formik.values;
-      
-      // First ensure the admin user exists with cache-busting
-      console.log('Setting up admin account...');
-      const timestamp = new Date().getTime(); // Add timestamp to prevent caching
-      const setupResponse = await fetch(`/api/demo/create-admin-user?t=${timestamp}`, {
-        method: 'POST',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      });
-      
-      const setupData = await setupResponse.json();
-      
-      if (!setupResponse.ok) {
-        console.error('Error setting up admin account:', setupData);
-        throw new Error(setupData.error || 'Failed to setup admin account');
-      }
-      
-      console.log('Admin setup successful, proceeding to sign in');
-      
-      // Sign out first to ensure clean state
-      try {
-        const supabase = createClient();
-        await supabase.auth.signOut();
-        console.log('Signed out any existing session');
-      } catch (signOutError) {
-        console.error('Error during pre-login signout:', signOutError);
-        // Continue anyway
-      }
-      
-      // Wait a moment to ensure signout is complete
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Attempt to sign in
-      console.log('Signing in with email and password');
-      await signIn(email, password);
-      
-      // Wait for auth state to update
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      console.log('Redirecting to admin page');
-      // Use direct location change for more reliable navigation
-      window.location.href = '/admin';
-    } catch (error) {
-      console.error('Login error:', error);
-      toast({
-        variant: "destructive",
-        title: "Login failed",
-        description: error instanceof Error 
-          ? `Error: ${error.message}` 
-          : "Please check your credentials and try again.",
-      });
-    } finally {
       setIsLoading(false);
-    }
-  }
-
-  const validationSchema = Yup.object().shape({
-    email: Yup.string().required("Email is required").email("Email is invalid"),
-    password: Yup.string()
-      .required("Password is required")
-      .min(4, "Must be at least 4 characters")
-      .max(40, "Must not exceed 40 characters"),
-  });
-
-  const formik = useFormik({
-    initialValues: {
-      email: 'admin@papertrader.app',
-      password: 'admin1234',
-    },
-    validationSchema,
-    onSubmit: handleLogin,
-  });
-
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleLogin(e);
     }
   };
 
@@ -249,133 +186,110 @@ const AdminLoginPage = () => {
           <Logo />
         </div>
 
-        <Card className="w-full md:w-[440px]" onKeyDown={handleKeyPress}>
+        <Card className="w-full md:w-[440px]">
           <CardHeader>
             <CardTitle className="text-center">Admin Login</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleLogin}>
-              <div className="flex flex-col gap-6">
-                <div className="flex flex-col gap-6">
-                  <p className="text-center text-sm text-muted-foreground">Enter admin credentials</p>
-                  <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="email">Email</Label>
+            <div className="flex flex-col gap-6">
+              <Button
+                onClick={handleDirectAdminLogin}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={isLoading}
+              >
+                {isLoading ? "Logging in..." : "One-Click Admin Login"}
+              </Button>
+              
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    Or use credentials
+                  </span>
+                </div>
+              </div>
+              
+              <form onSubmit={handleLogin}>
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      placeholder="Enter admin email"
+                      value={formik.values.email}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                    />
+                    {formik.touched.email && formik.errors.email && (
+                      <p className="text-destructive text-xs">{formik.errors.email}</p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="password">Password</Label>
+                    <div className="relative">
                       <Input
-                        id="email"
-                        name="email"
-                        type="email"
-                        placeholder="Enter admin email"
-                        value={formik.values.email}
+                        id="password"
+                        name="password"
+                        type={showPw ? 'text' : 'password'}
+                        placeholder="Enter admin password"
+                        value={formik.values.password}
                         onChange={formik.handleChange}
                         onBlur={formik.handleBlur}
                       />
-                      {formik.touched.email && formik.errors.email && (
-                        <p className="text-destructive text-xs">{formik.errors.email}</p>
-                      )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                        onClick={() => setShowPw(!showPw)}
+                      >
+                        {showPw
+                          ? <FaEye className="text-muted-foreground" />
+                          : <FaEyeSlash className="text-muted-foreground" />
+                        }
+                      </Button>
                     </div>
-
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="password">Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="password"
-                          name="password"
-                          type={showPw ? 'text' : 'password'}
-                          placeholder="Enter admin password"
-                          value={formik.values.password}
-                          onChange={formik.handleChange}
-                          onBlur={formik.handleBlur}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                          onClick={() => setShowPw(!showPw)}
-                        >
-                          {showPw
-                            ? <FaEye className="text-muted-foreground" />
-                            : <FaEyeSlash className="text-muted-foreground" />
-                          }
-                        </Button>
-                      </div>
-                      {formik.touched.password && formik.errors.password && (
-                        <p className="text-destructive text-xs">{formik.errors.password}</p>
-                      )}
-                    </div>
+                    {formik.touched.password && formik.errors.password && (
+                      <p className="text-destructive text-xs">{formik.errors.password}</p>
+                    )}
                   </div>
-                </div>
-                <Button
-                  onClick={async (e) => {
-                    e.preventDefault();
-                    setIsLoading(true);
-                    
-                    try {
-                      // Ensure admin user exists
-                      const timestamp = new Date().getTime(); // Add timestamp to prevent caching
-                      await fetch(`/api/demo/create-admin-user?t=${timestamp}`, {
-                        method: 'POST',
-                        headers: {
-                          'Cache-Control': 'no-cache, no-store, must-revalidate',
-                          'Pragma': 'no-cache',
-                          'Expires': '0'
-                        },
-                      });
-                      
-                      // Set admin credentials
-                      formik.setFieldValue('email', 'admin@papertrader.app');
-                      formik.setFieldValue('password', 'admin1234');
-                      
-                      // Submit form after a short delay to allow field values to update
-                      setTimeout(() => {
-                        handleLogin(e);
-                      }, 100);
-                    } catch (error) {
-                      console.error('Error setting up admin account:', error);
-                      toast({
-                        variant: "destructive",
-                        title: "Admin login failed",
-                        description: "Unable to set up admin account. Please try again.",
-                      });
-                      setIsLoading(false);
-                    }
-                  }}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  {isLoading ? "Logging in..." : "Auto Login as Admin"}
-                </Button>
-                
-                <Button
-                  type="submit"
-                  className="w-full mt-2"
-                  disabled={isLoading || initializing || !formik.values.email || !formik.values.password || !formik.isValid}
-                  onClick={handleLogin}
-                >
-                  Login with Credentials
-                </Button>
-                
-                <div className="mt-4 text-center">
+                  
                   <Button
-                    type="button"
-                    variant="link"
-                    className="text-xs text-muted-foreground"
-                    onClick={clearCacheAndServiceWorkers}
-                    disabled={isClearingCache}
+                    type="submit"
+                    className="w-full mt-2"
+                    disabled={isLoading || !formik.values.email || !formik.values.password || !formik.isValid}
                   >
-                    {isClearingCache ? "Clearing cache..." : "Having trouble? Clear browser cache"}
+                    Login with Credentials
                   </Button>
                 </div>
+              </form>
+              
+              <div className="mt-4 text-center">
                 <Button
                   type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => router.push('/login')}
+                  variant="link"
+                  className="text-xs text-muted-foreground"
+                  onClick={clearCache}
+                  disabled={isLoading}
                 >
-                  Back to Regular Login
+                  Having trouble? Clear browser cache
                 </Button>
               </div>
-            </form>
+              
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => router.push('/login')}
+              >
+                Back to Regular Login
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
