@@ -10,6 +10,14 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   const router = useRouter();
   const [isNavigating, setIsNavigating] = useState(false);
 
+  // Check if user has admin role
+  const isAdmin = user && (
+    user.email === "admin@papertrader.app" || 
+    user.email === "demo@papertrader.app" || 
+    user.user_metadata?.role === "ADMIN" ||
+    user.app_metadata?.role === "ADMIN"
+  );
+
   useEffect(() => {
     // Only handle protection logic if not already navigating
     // This prevents multiple redirects and navigation cancellations
@@ -17,8 +25,46 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
       const isPublicRoute = publicRoutes.includes(router.pathname);
       const isAdminRoute = adminRoutes.includes(router.pathname);
       
+      // Special case for admin routes
+      if (isAdminRoute) {
+        // If trying to access admin login page, allow it
+        if (router.pathname === '/admin-login') {
+          return;
+        }
+        
+        // If trying to access admin page but not logged in
+        if (!user) {
+          console.log('User not authenticated for admin route, redirecting to admin login');
+          setIsNavigating(true);
+          router.push('/admin-login').finally(() => {
+            setTimeout(() => setIsNavigating(false), 500);
+          });
+          return;
+        }
+        
+        // If trying to access admin page but not admin
+        if (user && !isAdmin && router.pathname !== '/admin-login') {
+          console.log('User not admin, redirecting to dashboard');
+          setIsNavigating(true);
+          router.push('/dashboard-india').finally(() => {
+            setTimeout(() => setIsNavigating(false), 500);
+          });
+          return;
+        }
+        
+        // If admin user is trying to access admin login, redirect to admin page
+        if (user && isAdmin && router.pathname === '/admin-login') {
+          console.log('Admin already authenticated, redirecting to admin page');
+          setIsNavigating(true);
+          router.push('/admin').finally(() => {
+            setTimeout(() => setIsNavigating(false), 500);
+          });
+          return;
+        }
+      }
+      
       // If user is not logged in and trying to access protected route
-      if (!user && !isPublicRoute) {
+      if (!user && !isPublicRoute && !isAdminRoute) {
         console.log('User not authenticated, redirecting to login');
         setIsNavigating(true);
         router.push('/login').finally(() => {

@@ -59,44 +59,45 @@ const AdminLoginPage = () => {
       }
       
       // Wait a moment to ensure signout is complete
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Use demo user credentials but set admin role in AuthContext
       try {
         // Sign in with demo credentials
         console.log('Attempting to sign in with demo@papertrader.app');
-        await signIn('demo@papertrader.app', 'demo1234');
-        console.log('Admin sign in successful using demo account');
         
-        // Wait a moment to ensure the auth state is updated
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Create a fresh Supabase client
+        const freshSupabase = createClient();
         
-        // Force a hard redirect to the admin page
-        console.log('Redirecting to admin page');
+        // Sign in directly with Supabase client to bypass any middleware
+        const { data, error } = await freshSupabase.auth.signInWithPassword({
+          email: 'demo@papertrader.app',
+          password: 'demo1234'
+        });
         
-        // Use window.location for a hard redirect instead of router.push
-        window.location.href = '/admin';
-      } catch (signInError) {
-        console.error('Admin sign in error:', signInError);
+        if (error) {
+          throw error;
+        }
         
-        // If sign in fails, try one more time after a delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        try {
-          console.log('Retrying sign in with demo@papertrader.app');
-          await signIn('demo@papertrader.app', 'demo1234');
-          console.log('Admin sign in successful on retry');
+        if (data.user) {
+          console.log('Admin sign in successful using demo account');
           
-          // Wait a moment to ensure the auth state is updated
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Set admin role in user metadata
+          await freshSupabase.auth.updateUser({
+            data: { role: 'ADMIN' }
+          });
+          
+          // Wait to ensure auth state is updated
+          await new Promise(resolve => setTimeout(resolve, 3000));
           
           // Force a hard redirect to the admin page
-          console.log('Redirecting to admin page after retry');
+          console.log('Redirecting to admin page');
           window.location.href = '/admin';
-        } catch (retryError) {
-          console.error('Admin sign in retry error:', retryError);
-          throw retryError;
+        } else {
+          throw new Error('No user data returned from authentication');
         }
+      } catch (signInError) {
+        console.error('Admin sign in error:', signInError);
+        throw signInError;
       }
     } catch (error) {
       console.error('Admin login error:', error);

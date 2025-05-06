@@ -663,7 +663,7 @@ export default function AdminDashboard() {
     }, 1500);
   };
 
-  // Check if user is admin - more robust check that also accepts demo user
+  // Check if user is admin - simplified check that treats demo user as admin
   const isAdmin = user && (
     user.email === "admin@papertrader.app" || 
     user.email === "demo@papertrader.app" || 
@@ -677,18 +677,28 @@ export default function AdminDashboard() {
     console.log('Admin check - App metadata:', user?.app_metadata);
     console.log('Admin check - Is admin:', isAdmin);
     
-    // Add a delay to ensure auth state is fully loaded
+    // If no user is found, redirect to admin login
+    if (!initializing && !user) {
+      console.log('No user found, redirecting to admin login');
+      router.replace('/admin-login');
+      return;
+    }
+    
+    // Add a longer delay to ensure auth state is fully loaded
     const checkAdminStatus = setTimeout(() => {
+      // Force demo@papertrader.app to be treated as admin regardless of metadata
+      if (user && user.email === "demo@papertrader.app") {
+        console.log('Demo user detected, granting admin access');
+        return;
+      }
+      
       if (user && !isAdmin) {
         console.log('User is not admin, redirecting to dashboard');
         router.replace('/dashboard-india');
-      } else if (!user) {
-        console.log('No user found, redirecting to admin login');
-        router.replace('/admin-login');
       } else {
         console.log('Admin access granted');
       }
-    }, 1000);
+    }, 2000);
     
     return () => clearTimeout(checkAdminStatus);
   }, [user, isAdmin, router]);

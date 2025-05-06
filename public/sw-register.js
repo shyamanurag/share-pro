@@ -103,14 +103,24 @@ const isAdminOrAuthPage =
 async function initializeServiceWorker() {
   console.log('Initializing service worker management...');
   
-  // For auth pages, always clear everything
-  if (isAdminOrAuthPage) {
-    console.log('On auth/admin page - clearing all caches and storage');
+  // For admin pages, completely disable service worker
+  if (window.location.pathname.includes('/admin') || 
+      window.location.pathname.includes('/admin-login')) {
+    console.log('On admin page - disabling service worker completely');
     await clearAuthStorage();
     await sendClearCacheMessage();
     await clearAllCaches();
     await unregisterServiceWorkers();
-    return; // Don't register service worker on auth pages
+    return; // Don't register service worker on admin pages
+  }
+  
+  // For auth pages, clear everything but still allow service worker for non-admin pages
+  if (isAdminOrAuthPage) {
+    console.log('On auth page - clearing all caches and storage');
+    await clearAuthStorage();
+    await sendClearCacheMessage();
+    await clearAllCaches();
+    // Don't unregister service workers for regular auth pages
   } 
   
   // For non-admin pages, register or update the service worker
