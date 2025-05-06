@@ -120,7 +120,13 @@ export default function Dashboard() {
   const [tradeQuantity, setTradeQuantity] = useState(1);
   const [tradeType, setTradeType] = useState<'BUY' | 'SELL'>('BUY');
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
+  const [isFuturesTradeDialogOpen, setIsFuturesTradeDialogOpen] = useState(false);
   const [showMarketInfo, setShowMarketInfo] = useState(false);
+  const [futuresQuantity, setFuturesQuantity] = useState(1);
+  const [futuresTradeType, setFuturesTradeType] = useState<'BUY' | 'SELL'>('BUY');
+  const [selectedFuturesStock, setSelectedFuturesStock] = useState<Stock | null>(null);
+  const [futuresContracts, setFuturesContracts] = useState<any[]>([]);
+  const [selectedFuturesContract, setSelectedFuturesContract] = useState<any>(null);
 
   // Fetch stocks
   const fetchStocks = async () => {
@@ -354,6 +360,94 @@ export default function Dashboard() {
   const calculateTradeValue = () => {
     if (!selectedStock) return 0;
     return selectedStock.currentPrice * tradeQuantity;
+  };
+
+  // Open futures trade dialog
+  const openFuturesTradeDialog = async (stock: Stock, type: 'BUY' | 'SELL' = 'BUY') => {
+    setSelectedFuturesStock(stock);
+    setFuturesTradeType(type);
+    setFuturesQuantity(1);
+    
+    try {
+      setIsLoading(true);
+      
+      // Fetch futures contracts for this stock
+      const response = await fetch(`/api/fno/futures?stockId=${stock.id}`);
+      if (!response.ok) throw new Error('Failed to fetch futures contracts');
+      
+      const data = await response.json();
+      setFuturesContracts(data.futuresContracts);
+      
+      if (data.futuresContracts.length > 0) {
+        setSelectedFuturesContract(data.futuresContracts[0]);
+      }
+      
+      setIsFuturesTradeDialogOpen(true);
+    } catch (error) {
+      console.error('Error fetching futures contracts:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to fetch futures contracts",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Execute futures trade
+  const executeFuturesTrade = async () => {
+    if (!selectedFuturesContract) return;
+    
+    try {
+      const response = await fetch('/api/fno/futures', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          futuresContractId: selectedFuturesContract.id,
+          quantity: futuresQuantity,
+          type: futuresTradeType,
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to execute futures trade');
+      }
+      
+      const data = await response.json();
+      
+      // Refresh user profile to get updated balance
+      fetchUserProfile();
+      
+      setIsFuturesTradeDialogOpen(false);
+      
+      toast({
+        title: `Futures ${futuresTradeType === 'BUY' ? 'Purchase' : 'Sale'} Successful`,
+        description: data.message,
+      });
+    } catch (error: any) {
+      console.error('Error executing futures trade:', error);
+      toast({
+        variant: "destructive",
+        title: "Trade Failed",
+        description: error.message || "Failed to execute futures trade",
+      });
+    }
+  };
+
+  // Calculate futures trade value
+  const calculateFuturesTradeValue = () => {
+    if (!selectedFuturesContract) return 0;
+    return selectedFuturesContract.contractPrice * selectedFuturesContract.lotSize * futuresQuantity;
+  };
+
+  // Calculate margin required for futures trade
+  const calculateMarginRequired = () => {
+    if (!selectedFuturesContract) return 0;
+    return selectedFuturesContract.marginRequired * futuresQuantity;
   };
 
   if (!user) {
@@ -744,20 +838,14 @@ export default function Dashboard() {
                                       <Button 
                                         size="sm"
                                         className="w-[48%] bg-green-500 hover:bg-green-600 text-white"
-                                        onClick={() => toast({
-                                          title: "Coming Soon",
-                                          description: "Futures trading will be available soon!",
-                                        })}
+                                        onClick={() => openFuturesTradeDialog(stock, 'BUY')}
                                       >
                                         <ShoppingCart className="w-3 h-3 mr-1" /> Buy
                                       </Button>
                                       <Button 
                                         size="sm"
                                         className="w-[48%] bg-red-500 hover:bg-red-600 text-white"
-                                        onClick={() => toast({
-                                          title: "Coming Soon",
-                                          description: "Futures trading will be available soon!",
-                                        })}
+                                        onClick={() => openFuturesTradeDialog(stock, 'SELL')}
                                       >
                                         <ArrowUpRight className="w-3 h-3 mr-1" /> Sell
                                       </Button>
@@ -1964,6 +2052,148 @@ export default function Dashboard() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Futures Trade Dialog */}
+      <Dialog open={isFuturesTradeDialogOpen} onOpenChange={setIsFuturesTradeDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {futuresTradeType === 'BUY' ? 'Buy' : 'Sell'} {selectedFuturesStock?.symbol} Futures
+            </DialogTitle>
+            <DialogDescription>
+              {selectedFuturesStock?.name} Futures Contract
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="flex justify-between items-center">
+              <p className="text-sm font-medium">Available Balance:</p>
+              <p className="text-sm font-bold flex items-center">
+                <IndianRupee className="w-3.5 h-3.5 mr-0.5" />
+                {userProfile?.balance?.toFixed(2) || "0.00"}
+              </p>
+            </div>
+            
+            {futuresContracts.length > 0 ? (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Select Contract</label>
+                  <select 
+                    className="w-full p-2 border rounded-md"
+                    value={selectedFuturesContract?.id || ""}
+                    onChange={(e) => {
+                      const contract = futuresContracts.find(c => c.id === e.target.value);
+                      if (contract) setSelectedFuturesContract(contract);
+                    }}
+                  >
+                    {futuresContracts.map(contract => (
+                      <option key={contract.id} value={contract.id}>
+                        {selectedFuturesStock?.symbol} - Expiry: {new Date(contract.expiryDate).toLocaleDateString()}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                {selectedFuturesContract && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-blue-50 dark:bg-blue-950/30 p-2 rounded-md">
+                        <p className="text-xs text-muted-foreground">Contract Price</p>
+                        <p className="font-semibold flex items-center">
+                          <IndianRupee className="w-3 h-3 mr-0.5" />
+                          {selectedFuturesContract.contractPrice.toFixed(2)}
+                        </p>
+                      </div>
+                      <div className="bg-blue-50 dark:bg-blue-950/30 p-2 rounded-md">
+                        <p className="text-xs text-muted-foreground">Lot Size</p>
+                        <p className="font-semibold">{selectedFuturesContract.lotSize} shares</p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Quantity (Lots)</label>
+                      <div className="flex items-center">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setFuturesQuantity(Math.max(1, futuresQuantity - 1))}
+                          disabled={futuresQuantity <= 1}
+                        >
+                          -
+                        </Button>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={futuresQuantity}
+                          onChange={(e) => setFuturesQuantity(parseInt(e.target.value) || 1)}
+                          className="mx-2 text-center"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setFuturesQuantity(futuresQuantity + 1)}
+                        >
+                          +
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-blue-50 dark:bg-blue-950/30 p-2 rounded-md">
+                        <p className="text-xs text-muted-foreground">Contract Value</p>
+                        <p className="font-semibold flex items-center">
+                          <IndianRupee className="w-3 h-3 mr-0.5" />
+                          {calculateFuturesTradeValue().toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                        </p>
+                      </div>
+                      <div className="bg-blue-50 dark:bg-blue-950/30 p-2 rounded-md">
+                        <p className="text-xs text-muted-foreground">Margin Required</p>
+                        <p className="font-semibold flex items-center">
+                          <IndianRupee className="w-3 h-3 mr-0.5" />
+                          {calculateMarginRequired().toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {calculateMarginRequired() > (userProfile?.balance || 0) && (
+                      <div className="text-red-500 text-sm">
+                        Insufficient balance for margin requirement
+                      </div>
+                    )}
+                  </>
+                )}
+                
+                <DialogFooter className="mt-4">
+                  <Button variant="outline" onClick={() => setIsFuturesTradeDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={executeFuturesTrade}
+                    disabled={
+                      !selectedFuturesContract || 
+                      calculateMarginRequired() > (userProfile?.balance || 0)
+                    }
+                    className={futuresTradeType === 'BUY' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'}
+                  >
+                    {futuresTradeType === 'BUY' ? 'Buy' : 'Sell'} Futures
+                  </Button>
+                </DialogFooter>
+              </>
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-muted-foreground mb-4">No futures contracts available for this stock.</p>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsFuturesTradeDialogOpen(false)}
+                  className="mx-auto"
+                >
+                  Close
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
