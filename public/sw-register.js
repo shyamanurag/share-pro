@@ -88,21 +88,22 @@ async function sendClearCacheMessage() {
   return Promise.resolve();
 }
 
-// Check if we're on an admin page or authentication-related page
+// Check if we're on an admin page or authentication-related page - more specific matching
 const isAdminOrAuthPage = 
-  window.location.pathname.includes('/admin') || 
-  window.location.pathname.includes('/admin-login') ||
-  window.location.pathname.includes('/login') ||
-  window.location.pathname.includes('/signup') ||
-  window.location.pathname.includes('/magic-link-login') ||
-  window.location.pathname.includes('/reset-password') ||
-  window.location.pathname.includes('/forgot-password') ||
-  window.location.pathname.includes('/auth/');
+  window.location.pathname === '/admin' || 
+  window.location.pathname === '/admin-login' ||
+  window.location.pathname === '/login' ||
+  window.location.pathname === '/signup' ||
+  window.location.pathname === '/magic-link-login' ||
+  window.location.pathname === '/reset-password' ||
+  window.location.pathname === '/forgot-password' ||
+  window.location.pathname.startsWith('/auth/');
 
-// Check if we're specifically on an admin page
+// Check if we're specifically on an admin page - more specific matching
 const isAdminPage = 
-  window.location.pathname.includes('/admin') || 
-  window.location.pathname.includes('/admin-login');
+  window.location.pathname === '/admin' || 
+  window.location.pathname === '/admin-login' ||
+  window.location.pathname.startsWith('/admin/');
 
 // Main initialization function
 async function initializeServiceWorker() {
@@ -112,6 +113,10 @@ async function initializeServiceWorker() {
   if (isAdminPage) {
     console.log('On admin page - disabling service worker completely');
     
+    // Set flags to prevent service worker registration
+    localStorage.setItem('disableServiceWorker', 'true');
+    sessionStorage.setItem('disableServiceWorker', 'true');
+    
     // Unregister service workers first
     await unregisterServiceWorkers();
     
@@ -120,8 +125,12 @@ async function initializeServiceWorker() {
     await sendClearCacheMessage();
     await clearAllCaches();
     
-    // Add a flag to prevent service worker registration
-    sessionStorage.setItem('disableServiceWorker', 'true');
+    // Add event listener to prevent future service worker registration
+    window.addEventListener('beforeinstallprompt', (e) => {
+      console.log('Preventing service worker installation on admin page');
+      e.preventDefault();
+      return false;
+    });
     
     return; // Don't register service worker on admin pages
   }

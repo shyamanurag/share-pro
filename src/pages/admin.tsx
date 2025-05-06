@@ -688,60 +688,69 @@ export default function AdminDashboard() {
       adminUser: localStorage.getItem('adminUser')
     });
     
-    // Check for admin flags in storage first - this is the most reliable method
+    // Simplified admin access check with fallbacks
+    
+    // 1. Check for admin flags in storage first (most reliable)
     const adminUserFlag = localStorage.getItem('adminUser') === 'true' || sessionStorage.getItem('adminUser') === 'true';
     
-    // If admin flag is set, we can skip other checks
+    // 2. If admin flag is set, ensure it stays set and grant access
     if (adminUserFlag) {
       console.log('Admin flag detected in storage, granting admin access');
+      // Ensure both storage locations have the flag
+      localStorage.setItem('adminUser', 'true');
+      sessionStorage.setItem('adminUser', 'true');
       return;
     }
     
-    // If auth is still initializing, wait
+    // 3. If auth is still initializing, wait
     if (initializing) {
       console.log('Auth still initializing, waiting...');
       return;
     }
     
-    // Check for recent admin login attempt
+    // 4. Check for recent admin login attempt
     const adminLoginAttempt = sessionStorage.getItem('adminLoginAttempt') === 'true';
     const adminLoginTime = sessionStorage.getItem('adminLoginTime');
-    const isRecentAdminLogin = adminLoginTime && (Date.now() - parseInt(adminLoginTime)) < 60000; // Within 60 seconds
+    const isRecentAdminLogin = adminLoginTime && (Date.now() - parseInt(adminLoginTime)) < 120000; // Within 2 minutes
     
-    // If no user is found, check if there was a recent admin login attempt
-    if (!user) {
-      if (adminLoginAttempt && isRecentAdminLogin) {
-        console.log('Recent admin login detected but user not loaded yet, waiting...');
-        // Set admin flag to ensure access
+    // 5. If there was a recent login attempt, grant temporary access
+    if (adminLoginAttempt && isRecentAdminLogin) {
+      console.log('Recent admin login detected, granting temporary access');
+      // Set admin flag to ensure access
+      localStorage.setItem('adminUser', 'true');
+      sessionStorage.setItem('adminUser', 'true');
+      return;
+    }
+    
+    // 6. If we have a user, check if it's the demo user or has admin role
+    if (user) {
+      // Force demo@papertrader.app to be treated as admin regardless of metadata
+      if (user.email === "demo@papertrader.app" || user.email === "admin@papertrader.app") {
+        console.log('Demo/admin user detected, granting admin access');
+        // Ensure admin flags are set
         localStorage.setItem('adminUser', 'true');
         sessionStorage.setItem('adminUser', 'true');
         return;
       }
       
-      console.log('No user found, redirecting to admin login');
-      window.location.href = '/admin-login';
-      return;
-    }
-    
-    // Force demo@papertrader.app to be treated as admin regardless of metadata
-    if (user.email === "demo@papertrader.app") {
-      console.log('Demo user detected, granting admin access');
-      // Ensure admin flags are set
-      localStorage.setItem('adminUser', 'true');
-      sessionStorage.setItem('adminUser', 'true');
-      return;
-    }
-    
-    // If user is not admin, redirect to dashboard
-    if (!isAdmin) {
+      // Check for admin role in metadata
+      if (user.user_metadata?.role === "ADMIN" || user.app_metadata?.role === "ADMIN") {
+        console.log('Admin role detected in metadata, granting admin access');
+        localStorage.setItem('adminUser', 'true');
+        sessionStorage.setItem('adminUser', 'true');
+        return;
+      }
+      
+      // If user is not admin, redirect to dashboard
       console.log('User is not admin, redirecting to dashboard');
       window.location.href = '/dashboard-india';
-    } else {
-      console.log('Admin access granted');
-      // Ensure admin flags are set
-      localStorage.setItem('adminUser', 'true');
-      sessionStorage.setItem('adminUser', 'true');
+      return;
     }
+    
+    // 7. If no user and no admin flags, redirect to login
+    console.log('No user or admin flags found, redirecting to admin login');
+    window.location.href = '/admin-login';
+    
   }, [user, isAdmin, initializing]);
 
   if (!user || initializing) {

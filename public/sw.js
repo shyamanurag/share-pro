@@ -9,6 +9,23 @@ self.addEventListener('install', (event) => {
   }
 });
 
+// Also check for admin pages in the fetch event
+self.addEventListener('activate', (event) => {
+  // Check if we're on an admin page
+  const checkAdminPages = async () => {
+    const clients = await self.clients.matchAll({ type: 'window' });
+    for (const client of clients) {
+      if (client.url.includes('/admin') || client.url.includes('/admin-login')) {
+        console.log('[Service Worker] Admin page detected, unregistering service worker');
+        self.registration.unregister();
+        return;
+      }
+    }
+  };
+  
+  event.waitUntil(checkAdminPages());
+});
+
 const CACHE_NAME = 'tradepaper-india-v6';
 const urlsToCache = [
   '/',
@@ -20,10 +37,11 @@ const urlsToCache = [
   '/icons/icon-512x512.png'
 ];
 
-// List of paths that should never be cached
+// List of paths that should never be cached - expanded list
 const neverCachePaths = [
   '/admin',
   '/admin-login',
+  '/admin/',
   '/login',
   '/signup',
   '/magic-link-login',
@@ -34,7 +52,10 @@ const neverCachePaths = [
   '/_next/data/', // Next.js data requests
   '/_next/static/', // Next.js static files
   'supabase',
-  'auth'
+  'auth',
+  'sb-',
+  '.json',
+  '.js'
 ];
 
 // List of paths that should always be network-first
@@ -76,6 +97,12 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // First, check if this is an admin-related request
+  if (event.request.url.includes('/admin') || event.request.url.includes('/admin-login')) {
+    console.log('[Service Worker] Admin request detected, bypassing service worker');
+    return; // Don't handle admin requests at all
+  }
+  
   // Skip handling for non-GET requests
   if (event.request.method !== 'GET') {
     return;

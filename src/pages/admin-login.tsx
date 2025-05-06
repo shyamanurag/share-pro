@@ -19,82 +19,74 @@ const AdminLoginPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  // Handle direct login with admin credentials
+  // Handle direct login with admin credentials - simplified approach
   const handleDirectAdminLogin = async () => {
     setIsLoading(true);
     try {
       console.log('Starting one-click admin login process');
       
-      // Set admin flags first to ensure they're available even if auth is slow
-      localStorage.setItem('adminUser', 'true');
-      sessionStorage.setItem('adminUser', 'true');
-      sessionStorage.setItem('adminLoginAttempt', 'true');
-      sessionStorage.setItem('adminLoginTime', Date.now().toString());
+      // First, clear everything
+      await clearBrowserState();
       
-      console.log('Admin flags set in storage');
+      // Create a completely fresh Supabase client
+      const freshSupabase = createClient();
       
-      // Use emergency admin access approach first
-      toast({
-        title: "Admin Access",
-        description: "Setting up admin access...",
+      // Sign in with demo credentials directly
+      console.log('Attempting to sign in with demo@papertrader.app');
+      
+      // First ensure the demo user exists via API
+      const demoResponse = await fetch('/api/demo/create-demo-user', {
+        method: 'POST',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
       });
       
-      // Wait a moment to ensure UI updates
-      await new Promise(resolve => setTimeout(resolve, 500));
+      if (!demoResponse.ok) {
+        const errorData = await demoResponse.json();
+        throw new Error(`Failed to create demo user: ${errorData.error}`);
+      }
       
-      // Redirect to admin page directly
-      console.log('Redirecting to admin page');
-      window.location.href = '/admin';
+      // Sign in directly with Supabase client
+      const { data, error } = await freshSupabase.auth.signInWithPassword({
+        email: 'demo@papertrader.app',
+        password: 'demo1234'
+      });
       
-      // The following code won't execute due to the redirect,
-      // but we'll keep it as a fallback in case the redirect fails
-      setTimeout(async () => {
-        try {
-          // If we're still here, try the full auth flow
-          console.log('Redirect failed, trying full auth flow');
-          
-          // Clear everything first
-          await clearBrowserState();
-          
-          // Create a completely fresh Supabase client
-          const freshSupabase = createClient();
-          
-          // Sign in with demo credentials
-          console.log('Attempting to sign in with demo@papertrader.app');
-          
-          // Sign in directly with Supabase client
-          const { data, error } = await freshSupabase.auth.signInWithPassword({
-            email: 'demo@papertrader.app',
-            password: 'demo1234'
-          });
-          
-          if (error) {
-            console.error('Sign in error:', error);
-            throw error;
-          }
-          
-          if (data.user) {
-            console.log('Admin sign in successful using demo account');
-            
-            // Set admin role in user metadata
-            await freshSupabase.auth.updateUser({
-              data: { role: 'ADMIN' }
-            });
-            
-            // Store admin flags again
-            localStorage.setItem('adminUser', 'true');
-            sessionStorage.setItem('adminUser', 'true');
-            sessionStorage.setItem('adminLoginAttempt', 'true');
-            sessionStorage.setItem('adminLoginTime', Date.now().toString());
-            
-            // Force a hard redirect to the admin page
-            window.location.replace('/admin');
-          }
-        } catch (fallbackError) {
-          console.error('Fallback admin login error:', fallbackError);
-          setIsLoading(false);
-        }
-      }, 3000);
+      if (error) {
+        console.error('Sign in error:', error);
+        throw error;
+      }
+      
+      if (data.user) {
+        console.log('Admin sign in successful using demo account');
+        
+        // Set admin role in user metadata
+        await freshSupabase.auth.updateUser({
+          data: { role: 'ADMIN' }
+        });
+        
+        // Store admin flags
+        localStorage.setItem('adminUser', 'true');
+        sessionStorage.setItem('adminUser', 'true');
+        sessionStorage.setItem('adminLoginAttempt', 'true');
+        sessionStorage.setItem('adminLoginTime', Date.now().toString());
+        
+        toast({
+          title: "Admin Access",
+          description: "Login successful. Redirecting to admin panel...",
+        });
+        
+        // Wait a moment to ensure storage is set
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Force a hard redirect to the admin page
+        window.location.href = '/admin';
+      } else {
+        throw new Error('No user data returned from authentication');
+      }
     } catch (error) {
       console.error('Admin login error:', error);
       toast({
@@ -108,15 +100,44 @@ const AdminLoginPage = () => {
     }
   };
   
-  // Helper function to clear browser state
+  // Helper function to clear browser state - enhanced version
   const clearBrowserState = async () => {
     console.log('Clearing browser state...');
+    
+    // Sign out from any existing session first
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      console.log('Successfully signed out before new sign in');
+    } catch (signOutError) {
+      console.error('Error during pre-signin signout:', signOutError);
+    }
     
     // Clear storage
     if (typeof window !== 'undefined') {
       console.log('Clearing local storage and session storage');
-      localStorage.clear();
-      sessionStorage.clear();
+      
+      // Clear specific auth-related items first
+      const authItems = ['supabase.auth.token', 'adminUser', 'adminLoginAttempt', 'adminLoginTime'];
+      authItems.forEach(item => {
+        localStorage.removeItem(item);
+        sessionStorage.removeItem(item);
+      });
+      
+      // Then clear all Supabase-related items
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.includes('supabase') || key.includes('sb-'))) {
+          localStorage.removeItem(key);
+        }
+      }
+      
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key && (key.includes('supabase') || key.includes('sb-'))) {
+          sessionStorage.removeItem(key);
+        }
+      }
     }
     
     // Unregister service workers
@@ -145,15 +166,6 @@ const AdminLoginPage = () => {
       }
     }
     
-    // Sign out from any existing session
-    try {
-      const supabase = createClient();
-      await supabase.auth.signOut();
-      console.log('Successfully signed out before new sign in');
-    } catch (signOutError) {
-      console.error('Error during pre-signin signout:', signOutError);
-    }
-    
     // Wait a moment to ensure everything is cleared
     await new Promise(resolve => setTimeout(resolve, 1000));
     console.log('Browser state cleared');
@@ -172,6 +184,31 @@ const AdminLoginPage = () => {
       
       // Clear everything first
       await clearBrowserState();
+      
+      // If this is the admin user, ensure it exists first
+      if (email === 'admin@papertrader.app') {
+        try {
+          console.log('Creating/verifying admin user before login');
+          const response = await fetch('/api/demo/create-admin-user', {
+            method: 'POST',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0'
+            },
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to set up admin user');
+          }
+          
+          console.log('Admin user setup successful');
+        } catch (adminError) {
+          console.error('Error setting up admin user:', adminError);
+          // Continue anyway, as the login might still work
+        }
+      }
       
       // Create a completely fresh Supabase client
       const freshSupabase = createClient();
@@ -209,12 +246,17 @@ const AdminLoginPage = () => {
         sessionStorage.setItem('adminLoginAttempt', 'true');
         sessionStorage.setItem('adminLoginTime', Date.now().toString());
         
+        toast({
+          title: "Login Successful",
+          description: "Redirecting to admin panel...",
+        });
+        
         // Wait to ensure auth state is updated
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Use direct location change for more reliable navigation
         console.log('Redirecting to admin page');
-        window.location.replace('/admin');
+        window.location.href = '/admin';
       } else {
         throw new Error('No user data returned from authentication');
       }
