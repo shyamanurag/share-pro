@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tradepaper-india-v4';
+const CACHE_NAME = 'tradepaper-india-v5';
 const urlsToCache = [
   '/',
   '/dashboard',
@@ -21,15 +21,34 @@ const neverCachePaths = [
   '/auth/',
   '/api/',
   '/_next/data/', // Next.js data requests
+  '/_next/static/', // Next.js static files
   'supabase',
   'auth'
+];
+
+// List of paths that should always be network-first
+const networkFirstPaths = [
+  '/',
+  '/dashboard',
+  '/dashboard-india',
+  '/portfolio',
+  '/profile',
+  '/watchlist'
 ];
 
 // Check if a URL should be excluded from caching
 function shouldExcludeFromCache(url) {
   const urlObj = new URL(url);
   return neverCachePaths.some(path => urlObj.pathname.includes(path)) || 
-         urlObj.search.includes('t='); // URLs with timestamp parameter
+         urlObj.search.includes('t=') || // URLs with timestamp parameter
+         urlObj.pathname.endsWith('.js') || // JavaScript files
+         urlObj.pathname.endsWith('.json'); // JSON files
+}
+
+// Check if a URL should use network-first strategy
+function shouldUseNetworkFirst(url) {
+  const urlObj = new URL(url);
+  return networkFirstPaths.some(path => urlObj.pathname === path);
 }
 
 self.addEventListener('install', (event) => {
@@ -69,7 +88,27 @@ self.addEventListener('fetch', (event) => {
     );
   }
   
-  // For other requests, try the cache first
+  // For navigation requests to main routes, use network-first strategy
+  if (shouldUseNetworkFirst(event.request.url)) {
+    console.log('[Service Worker] Using network-first for:', event.request.url);
+    return event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          // Cache the response for future use
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, responseToCache);
+          });
+          return response;
+        })
+        .catch(error => {
+          console.log('[Service Worker] Network request failed, falling back to cache for:', event.request.url);
+          return caches.match(event.request);
+        })
+    );
+  }
+  
+  // For other requests, try the cache first (cache-first strategy)
   event.respondWith(
     caches.match(event.request)
       .then((response) => {

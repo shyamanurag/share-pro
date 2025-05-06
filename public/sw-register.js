@@ -110,32 +110,56 @@ async function initializeServiceWorker() {
     await sendClearCacheMessage();
     await clearAllCaches();
     await unregisterServiceWorkers();
-  } else {
-    // For non-admin pages, register or update the service worker
-    try {
-      // Check if service worker is already registered
-      const existingRegistration = await navigator.serviceWorker.getRegistration();
-      
-      if (existingRegistration) {
-        // If already registered, just update it
-        await existingRegistration.update();
-        console.log('Existing ServiceWorker updated');
-      } else {
-        // Otherwise register a new one
+    return; // Don't register service worker on auth pages
+  } 
+  
+  // For non-admin pages, register or update the service worker
+  try {
+    // Check if service worker is already registered
+    const existingRegistrations = await navigator.serviceWorker.getRegistrations();
+    
+    if (existingRegistrations.length > 0) {
+      // If already registered, just update it
+      for (const registration of existingRegistrations) {
+        try {
+          await registration.update();
+          console.log('Existing ServiceWorker updated:', registration.scope);
+        } catch (updateError) {
+          console.error('Error updating service worker:', updateError);
+        }
+      }
+    } else {
+      // Otherwise register a new one
+      try {
         const registration = await navigator.serviceWorker.register('/sw.js', {
           updateViaCache: 'none', // Don't use cached versions of the service worker
           scope: '/'
         });
         console.log('ServiceWorker registration successful with scope:', registration.scope);
+      } catch (registerError) {
+        console.error('Error registering new service worker:', registerError);
       }
-      
-      // Clear auth storage anyway to be safe
-      clearAuthStorage();
-    } catch (error) {
-      console.error('ServiceWorker registration failed:', error);
-      // Continue without service worker
-      clearAuthStorage();
     }
+    
+    // Add navigation preload support for faster navigation
+    if ('navigationPreload' in navigator.serviceWorker) {
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        if (registration.navigationPreload) {
+          await registration.navigationPreload.enable();
+          console.log('Navigation preload enabled');
+        }
+      } catch (preloadError) {
+        console.error('Error enabling navigation preload:', preloadError);
+      }
+    }
+    
+    // Clear auth storage anyway to be safe
+    clearAuthStorage();
+  } catch (error) {
+    console.error('ServiceWorker management failed:', error);
+    // Continue without service worker
+    clearAuthStorage();
   }
 }
 
