@@ -634,18 +634,6 @@ export default function Dashboard() {
               >
                 <Info className="w-5 h-5 text-muted-foreground" />
               </Button>
-              <div className="relative">
-                <Bell className="w-5 h-5 text-muted-foreground" />
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
-              </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={signOut}
-                className="text-sm"
-              >
-                Log Out
-              </Button>
             </div>
           </div>
           
@@ -699,6 +687,442 @@ export default function Dashboard() {
         </header>
         
         <main className="flex-1 p-4 pb-20">
+          {activeSection === "watchlist" && (
+            <>
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-xl font-bold">Watchlists</h2>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex items-center gap-1"
+                      >
+                        <Plus className="w-4 h-4" />
+                        New Watchlist
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Create New Watchlist</DialogTitle>
+                        <DialogDescription>
+                          Enter a name for your new watchlist
+                        </DialogDescription>
+                      </DialogHeader>
+                      <form onSubmit={async (e) => {
+                        e.preventDefault();
+                        const formData = new FormData(e.currentTarget);
+                        const name = formData.get('watchlistName') as string;
+                        
+                        if (!name.trim()) {
+                          toast({
+                            variant: "destructive",
+                            title: "Error",
+                            description: "Watchlist name cannot be empty",
+                          });
+                          return;
+                        }
+                        
+                        try {
+                          const response = await fetch('/api/watchlists', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ name }),
+                          });
+                          
+                          if (!response.ok) {
+                            const error = await response.json();
+                            throw new Error(error.error || 'Failed to create watchlist');
+                          }
+                          
+                          const data = await response.json();
+                          
+                          // Fetch all watchlists to update the dropdown
+                          fetchWatchlist();
+                          
+                          toast({
+                            title: "Watchlist Created",
+                            description: `"${name}" watchlist has been created`,
+                          });
+                          
+                          // Close the dialog
+                          document.getElementById('closeWatchlistDialog')?.click();
+                        } catch (error: any) {
+                          toast({
+                            variant: "destructive",
+                            title: "Error",
+                            description: error.message || "Failed to create watchlist",
+                          });
+                        }
+                      }}>
+                        <div className="grid gap-4 py-4">
+                          <div className="grid grid-cols-4 items-center gap-4">
+                            <label htmlFor="watchlistName" className="text-right text-sm font-medium col-span-1">
+                              Name
+                            </label>
+                            <Input
+                              id="watchlistName"
+                              name="watchlistName"
+                              placeholder="My Tech Stocks"
+                              className="col-span-3"
+                              required
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button id="closeWatchlistDialog" type="button" variant="outline" className="hidden">
+                            Cancel
+                          </Button>
+                          <Button type="submit">Create Watchlist</Button>
+                        </DialogFooter>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={refreshStocks}
+                  disabled={isLoading}
+                  className="flex items-center gap-1"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
+              
+              {/* Watchlist selector */}
+              <div className="mb-6">
+                <select 
+                  className="w-full p-2 border rounded-md"
+                  value={activeWatchlistId}
+                  onChange={async (e) => {
+                    const newWatchlistId = e.target.value;
+                    setActiveWatchlistId(newWatchlistId);
+                    
+                    try {
+                      const response = await fetch(`/api/watchlist?watchlistId=${newWatchlistId}`);
+                      if (!response.ok) throw new Error('Failed to fetch watchlist');
+                      
+                      const data = await response.json();
+                      setWatchlistItems(data.items);
+                      setActiveWatchlist(data.watchlist);
+                    } catch (error) {
+                      console.error('Error fetching watchlist:', error);
+                      toast({
+                        variant: "destructive",
+                        title: "Error",
+                        description: "Failed to load watchlist",
+                      });
+                    }
+                  }}
+                >
+                  {allWatchlists.map(watchlist => (
+                    <option key={watchlist.id} value={watchlist.id}>
+                      {watchlist.name} ({watchlistCounts[watchlist.id] || 0} stocks)
+                    </option>
+                  ))}
+                </select>
+                
+                {activeWatchlist && (
+                  <div className="flex justify-between items-center mt-2">
+                    <div className="flex items-center gap-2">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-xs"
+                          >
+                            Rename
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>Rename Watchlist</DialogTitle>
+                            <DialogDescription>
+                              Enter a new name for "{activeWatchlist.name}"
+                            </DialogDescription>
+                          </DialogHeader>
+                          <form onSubmit={async (e) => {
+                            e.preventDefault();
+                            const formData = new FormData(e.currentTarget);
+                            const name = formData.get('newWatchlistName') as string;
+                            
+                            if (!name.trim()) {
+                              toast({
+                                variant: "destructive",
+                                title: "Error",
+                                description: "Watchlist name cannot be empty",
+                              });
+                              return;
+                            }
+                            
+                            try {
+                              const response = await fetch(`/api/watchlists/${activeWatchlist.id}`, {
+                                method: 'PUT',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({ name }),
+                              });
+                              
+                              if (!response.ok) {
+                                const error = await response.json();
+                                throw new Error(error.error || 'Failed to rename watchlist');
+                              }
+                              
+                              // Fetch all watchlists to update the dropdown
+                              fetchWatchlist();
+                              
+                              toast({
+                                title: "Watchlist Renamed",
+                                description: `Watchlist has been renamed to "${name}"`,
+                              });
+                              
+                              // Close the dialog
+                              document.getElementById('closeRenameDialog')?.click();
+                            } catch (error: any) {
+                              toast({
+                                variant: "destructive",
+                                title: "Error",
+                                description: error.message || "Failed to rename watchlist",
+                              });
+                            }
+                          }}>
+                            <div className="grid gap-4 py-4">
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <label htmlFor="newWatchlistName" className="text-right text-sm font-medium col-span-1">
+                                  New Name
+                                </label>
+                                <Input
+                                  id="newWatchlistName"
+                                  name="newWatchlistName"
+                                  defaultValue={activeWatchlist.name}
+                                  className="col-span-3"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button id="closeRenameDialog" type="button" variant="outline" className="hidden">
+                                Cancel
+                              </Button>
+                              <Button type="submit">Rename Watchlist</Button>
+                            </DialogFooter>
+                          </form>
+                        </DialogContent>
+                      </Dialog>
+                      
+                      {allWatchlists.length > 1 && (
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="text-xs text-red-500 hover:text-red-700 hover:bg-red-100"
+                            >
+                              Delete
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="sm:max-w-md">
+                            <DialogHeader>
+                              <DialogTitle>Delete Watchlist</DialogTitle>
+                              <DialogDescription>
+                                Are you sure you want to delete "{activeWatchlist.name}"? This action cannot be undone.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="py-4">
+                              <p className="text-sm text-muted-foreground">
+                                All stocks in this watchlist will be removed. This action is permanent.
+                              </p>
+                            </div>
+                            <DialogFooter>
+                              <Button 
+                                id="closeDeleteDialog" 
+                                type="button" 
+                                variant="outline"
+                                onClick={() => {
+                                  document.getElementById('closeDeleteDialog')?.click();
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                              <Button 
+                                variant="destructive"
+                                onClick={async () => {
+                                  try {
+                                    const response = await fetch(`/api/watchlists/${activeWatchlist.id}`, {
+                                      method: 'DELETE',
+                                    });
+                                    
+                                    if (!response.ok) {
+                                      const error = await response.json();
+                                      throw new Error(error.error || 'Failed to delete watchlist');
+                                    }
+                                    
+                                    // Fetch all watchlists to update the dropdown
+                                    fetchWatchlist();
+                                    
+                                    toast({
+                                      title: "Watchlist Deleted",
+                                      description: `"${activeWatchlist.name}" has been deleted`,
+                                    });
+                                    
+                                    // Close the dialog
+                                    document.getElementById('closeDeleteDialog')?.click();
+                                  } catch (error: any) {
+                                    toast({
+                                      variant: "destructive",
+                                      title: "Error",
+                                      description: error.message || "Failed to delete watchlist",
+                                    });
+                                  }
+                                }}
+                              >
+                                Delete Watchlist
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Created: {new Date(activeWatchlist.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Search Bar */}
+              <div className="relative mb-6">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  type="text"
+                  placeholder="Search watchlist..."
+                  className="pl-10 pr-4 py-2 w-full"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              
+              {watchlistItems.length > 0 ? (
+                <div className="space-y-4">
+                  {isLoading ? (
+                    // Loading skeleton
+                    Array(3).fill(0).map((_, i) => (
+                      <Card key={i} className="animate-pulse">
+                        <CardContent className="p-4">
+                          <div className="flex justify-between">
+                            <div className="space-y-2">
+                              <div className="h-5 w-16 bg-muted rounded"></div>
+                              <div className="h-4 w-32 bg-muted rounded"></div>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="h-5 w-20 bg-muted rounded"></div>
+                              <div className="h-4 w-16 bg-muted rounded"></div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  ) : (
+                    watchlistItems.map(item => (
+                      <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <Card className="overflow-hidden hover:border-green-500/50 transition-colors">
+                          <CardContent className="p-4">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <div className="flex items-center space-x-2">
+                                  <h3 className="font-bold">{item.stock.symbol}</h3>
+                                  <Badge variant="outline" className="text-xs">
+                                    {item.stock.sector}
+                                  </Badge>
+                                  <div className="relative group">
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-8 w-8 relative"
+                                      onClick={() => toggleWatchlist(item.stockId, activeWatchlistId)}
+                                    >
+                                      <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                                    </Button>
+                                    <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-50">
+                                      Remove from watchlist
+                                    </div>
+                                  </div>
+                                </div>
+                                <p className="text-sm text-muted-foreground">{item.stock.name}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold flex items-center justify-end">
+                                  <IndianRupee className="w-3.5 h-3.5 mr-0.5" />
+                                  {item.stock.currentPrice.toFixed(2)}
+                                </p>
+                                <div className={`flex items-center justify-end text-sm ${item.stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                  {item.stock.change >= 0 ? (
+                                    <TrendingUp className="w-3 h-3 mr-1" />
+                                  ) : (
+                                    <TrendingDown className="w-3 h-3 mr-1" />
+                                  )}
+                                  <span>{item.stock.change >= 0 ? '+' : ''}{item.stock.change.toFixed(2)} ({item.stock.change >= 0 ? '+' : ''}{item.stock.changePercent.toFixed(2)}%)</span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="mt-3 pt-3 border-t border-border">
+                              <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                <div>Volume: {item.stock.volume.toLocaleString()}</div>
+                                <div>Market Cap: ₹{(item.stock.marketCap ? (item.stock.marketCap / 10000000).toFixed(2) : "N/A")} Cr</div>
+                              </div>
+                              <div className="mt-3 flex justify-between">
+                                <Button 
+                                  size="sm"
+                                  className="w-[48%] bg-green-500 hover:bg-green-600 text-white"
+                                  onClick={() => openTradeDialog(item.stock, 'BUY')}
+                                >
+                                  <ShoppingCart className="w-3 h-3 mr-1" /> Buy
+                                </Button>
+                                <Button 
+                                  size="sm"
+                                  className="w-[48%] bg-red-500 hover:bg-red-600 text-white"
+                                  onClick={() => openTradeDialog(item.stock, 'SELL')}
+                                >
+                                  <ArrowUpRight className="w-3 h-3 mr-1" /> Sell
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-12 border border-dashed border-muted-foreground/20 rounded-lg">
+                  <Star className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">This watchlist is empty</h3>
+                  <p className="text-muted-foreground mb-4">Add stocks to your watchlist by clicking the star icon</p>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setActiveSection("home")}
+                    className="mx-auto"
+                  >
+                    Browse Market
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+          
           {activeSection === "home" && (
             <>
               {/* User Balance Card */}
@@ -746,9 +1170,8 @@ export default function Dashboard() {
               
               {/* Tabs */}
               <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="market">Market</TabsTrigger>
-                  <TabsTrigger value="watchlist">Watchlist</TabsTrigger>
                   <TabsTrigger value="fno">F&O</TabsTrigger>
                 </TabsList>
                 
@@ -1233,427 +1656,7 @@ export default function Dashboard() {
                   </div>
                 </TabsContent>
                 
-                <TabsContent value="watchlist" className="mt-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <div className="flex items-center gap-3">
-                      <h2 className="text-xl font-bold">Watchlists</h2>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="flex items-center gap-1"
-                          >
-                            <Plus className="w-4 h-4" />
-                            New Watchlist
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-md">
-                          <DialogHeader>
-                            <DialogTitle>Create New Watchlist</DialogTitle>
-                            <DialogDescription>
-                              Enter a name for your new watchlist
-                            </DialogDescription>
-                          </DialogHeader>
-                          <form onSubmit={async (e) => {
-                            e.preventDefault();
-                            const formData = new FormData(e.currentTarget);
-                            const name = formData.get('watchlistName') as string;
-                            
-                            if (!name.trim()) {
-                              toast({
-                                variant: "destructive",
-                                title: "Error",
-                                description: "Watchlist name cannot be empty",
-                              });
-                              return;
-                            }
-                            
-                            try {
-                              const response = await fetch('/api/watchlists', {
-                                method: 'POST',
-                                headers: {
-                                  'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({ name }),
-                              });
-                              
-                              if (!response.ok) {
-                                const error = await response.json();
-                                throw new Error(error.error || 'Failed to create watchlist');
-                              }
-                              
-                              const data = await response.json();
-                              
-                              // Fetch all watchlists to update the dropdown
-                              fetchWatchlist();
-                              
-                              toast({
-                                title: "Watchlist Created",
-                                description: `"${name}" watchlist has been created`,
-                              });
-                              
-                              // Close the dialog
-                              document.getElementById('closeWatchlistDialog')?.click();
-                            } catch (error: any) {
-                              toast({
-                                variant: "destructive",
-                                title: "Error",
-                                description: error.message || "Failed to create watchlist",
-                              });
-                            }
-                          }}>
-                            <div className="grid gap-4 py-4">
-                              <div className="grid grid-cols-4 items-center gap-4">
-                                <label htmlFor="watchlistName" className="text-right text-sm font-medium col-span-1">
-                                  Name
-                                </label>
-                                <Input
-                                  id="watchlistName"
-                                  name="watchlistName"
-                                  placeholder="My Tech Stocks"
-                                  className="col-span-3"
-                                  required
-                                />
-                              </div>
-                            </div>
-                            <DialogFooter>
-                              <Button id="closeWatchlistDialog" type="button" variant="outline" className="hidden">
-                                Cancel
-                              </Button>
-                              <Button type="submit">Create Watchlist</Button>
-                            </DialogFooter>
-                          </form>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={refreshStocks}
-                      disabled={isLoading}
-                      className="flex items-center gap-1"
-                    >
-                      <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                      Refresh
-                    </Button>
-                  </div>
-                  
-                  {/* Watchlist selector */}
-                  <div className="mb-6">
-                    <select 
-                      className="w-full p-2 border rounded-md"
-                      value={activeWatchlistId}
-                      onChange={async (e) => {
-                        const newWatchlistId = e.target.value;
-                        setActiveWatchlistId(newWatchlistId);
-                        
-                        try {
-                          const response = await fetch(`/api/watchlist?watchlistId=${newWatchlistId}`);
-                          if (!response.ok) throw new Error('Failed to fetch watchlist');
-                          
-                          const data = await response.json();
-                          setWatchlistItems(data.items);
-                          setActiveWatchlist(data.watchlist);
-                        } catch (error) {
-                          console.error('Error fetching watchlist:', error);
-                          toast({
-                            variant: "destructive",
-                            title: "Error",
-                            description: "Failed to load watchlist",
-                          });
-                        }
-                      }}
-                    >
-                      {allWatchlists.map(watchlist => (
-                        <option key={watchlist.id} value={watchlist.id}>
-                          {watchlist.name} ({watchlistCounts[watchlist.id] || 0} stocks)
-                        </option>
-                      ))}
-                    </select>
-                    
-                    {activeWatchlist && (
-                      <div className="flex justify-between items-center mt-2">
-                        <div className="flex items-center gap-2">
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="text-xs"
-                              >
-                                Rename
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-md">
-                              <DialogHeader>
-                                <DialogTitle>Rename Watchlist</DialogTitle>
-                                <DialogDescription>
-                                  Enter a new name for "{activeWatchlist.name}"
-                                </DialogDescription>
-                              </DialogHeader>
-                              <form onSubmit={async (e) => {
-                                e.preventDefault();
-                                const formData = new FormData(e.currentTarget);
-                                const name = formData.get('newWatchlistName') as string;
-                                
-                                if (!name.trim()) {
-                                  toast({
-                                    variant: "destructive",
-                                    title: "Error",
-                                    description: "Watchlist name cannot be empty",
-                                  });
-                                  return;
-                                }
-                                
-                                try {
-                                  const response = await fetch(`/api/watchlists/${activeWatchlist.id}`, {
-                                    method: 'PUT',
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                    },
-                                    body: JSON.stringify({ name }),
-                                  });
-                                  
-                                  if (!response.ok) {
-                                    const error = await response.json();
-                                    throw new Error(error.error || 'Failed to rename watchlist');
-                                  }
-                                  
-                                  // Fetch all watchlists to update the dropdown
-                                  fetchWatchlist();
-                                  
-                                  toast({
-                                    title: "Watchlist Renamed",
-                                    description: `Watchlist has been renamed to "${name}"`,
-                                  });
-                                  
-                                  // Close the dialog
-                                  document.getElementById('closeRenameDialog')?.click();
-                                } catch (error: any) {
-                                  toast({
-                                    variant: "destructive",
-                                    title: "Error",
-                                    description: error.message || "Failed to rename watchlist",
-                                  });
-                                }
-                              }}>
-                                <div className="grid gap-4 py-4">
-                                  <div className="grid grid-cols-4 items-center gap-4">
-                                    <label htmlFor="newWatchlistName" className="text-right text-sm font-medium col-span-1">
-                                      New Name
-                                    </label>
-                                    <Input
-                                      id="newWatchlistName"
-                                      name="newWatchlistName"
-                                      defaultValue={activeWatchlist.name}
-                                      className="col-span-3"
-                                      required
-                                    />
-                                  </div>
-                                </div>
-                                <DialogFooter>
-                                  <Button id="closeRenameDialog" type="button" variant="outline" className="hidden">
-                                    Cancel
-                                  </Button>
-                                  <Button type="submit">Rename Watchlist</Button>
-                                </DialogFooter>
-                              </form>
-                            </DialogContent>
-                          </Dialog>
-                          
-                          {allWatchlists.length > 1 && (
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="text-xs text-red-500 hover:text-red-700 hover:bg-red-100"
-                                >
-                                  Delete
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent className="sm:max-w-md">
-                                <DialogHeader>
-                                  <DialogTitle>Delete Watchlist</DialogTitle>
-                                  <DialogDescription>
-                                    Are you sure you want to delete "{activeWatchlist.name}"? This action cannot be undone.
-                                  </DialogDescription>
-                                </DialogHeader>
-                                <div className="py-4">
-                                  <p className="text-sm text-muted-foreground">
-                                    All stocks in this watchlist will be removed. This action is permanent.
-                                  </p>
-                                </div>
-                                <DialogFooter>
-                                  <Button 
-                                    id="closeDeleteDialog" 
-                                    type="button" 
-                                    variant="outline"
-                                    onClick={() => {
-                                      document.getElementById('closeDeleteDialog')?.click();
-                                    }}
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button 
-                                    variant="destructive"
-                                    onClick={async () => {
-                                      try {
-                                        const response = await fetch(`/api/watchlists/${activeWatchlist.id}`, {
-                                          method: 'DELETE',
-                                        });
-                                        
-                                        if (!response.ok) {
-                                          const error = await response.json();
-                                          throw new Error(error.error || 'Failed to delete watchlist');
-                                        }
-                                        
-                                        // Fetch all watchlists to update the dropdown
-                                        fetchWatchlist();
-                                        
-                                        toast({
-                                          title: "Watchlist Deleted",
-                                          description: `"${activeWatchlist.name}" has been deleted`,
-                                        });
-                                        
-                                        // Close the dialog
-                                        document.getElementById('closeDeleteDialog')?.click();
-                                      } catch (error: any) {
-                                        toast({
-                                          variant: "destructive",
-                                          title: "Error",
-                                          description: error.message || "Failed to delete watchlist",
-                                        });
-                                      }
-                                    }}
-                                  >
-                                    Delete Watchlist
-                                  </Button>
-                                </DialogFooter>
-                              </DialogContent>
-                            </Dialog>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Created: {new Date(activeWatchlist.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {watchlistItems.length > 0 ? (
-                    <div className="space-y-4">
-                      {isLoading ? (
-                        // Loading skeleton
-                        Array(3).fill(0).map((_, i) => (
-                          <Card key={i} className="animate-pulse">
-                            <CardContent className="p-4">
-                              <div className="flex justify-between">
-                                <div className="space-y-2">
-                                  <div className="h-5 w-16 bg-muted rounded"></div>
-                                  <div className="h-4 w-32 bg-muted rounded"></div>
-                                </div>
-                                <div className="space-y-2">
-                                  <div className="h-5 w-20 bg-muted rounded"></div>
-                                  <div className="h-4 w-16 bg-muted rounded"></div>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))
-                      ) : (
-                        watchlistItems.map(item => (
-                          <motion.div
-                            key={item.id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.3 }}
-                          >
-                            <Card className="overflow-hidden hover:border-green-500/50 transition-colors">
-                              <CardContent className="p-4">
-                                <div className="flex justify-between items-start">
-                                  <div>
-                                    <div className="flex items-center space-x-2">
-                                      <h3 className="font-bold">{item.stock.symbol}</h3>
-                                      <Badge variant="outline" className="text-xs">
-                                        {item.stock.sector}
-                                      </Badge>
-                                      <div className="relative group">
-                                        <Button 
-                                          variant="ghost" 
-                                          size="icon" 
-                                          className="h-8 w-8 relative"
-                                          onClick={() => toggleWatchlist(item.stockId, activeWatchlistId)}
-                                        >
-                                          <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                                        </Button>
-                                        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-50">
-                                          Remove from watchlist
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground">{item.stock.name}</p>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="font-bold flex items-center justify-end">
-                                      <IndianRupee className="w-3.5 h-3.5 mr-0.5" />
-                                      {item.stock.currentPrice.toFixed(2)}
-                                    </p>
-                                    <div className={`flex items-center justify-end text-sm ${item.stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                      {item.stock.change >= 0 ? (
-                                        <TrendingUp className="w-3 h-3 mr-1" />
-                                      ) : (
-                                        <TrendingDown className="w-3 h-3 mr-1" />
-                                      )}
-                                      <span>{item.stock.change >= 0 ? '+' : ''}{item.stock.change.toFixed(2)} ({item.stock.change >= 0 ? '+' : ''}{item.stock.changePercent.toFixed(2)}%)</span>
-                                    </div>
-                                  </div>
-                                </div>
-                                
-                                <div className="mt-3 pt-3 border-t border-border">
-                                  <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                                    <div>Volume: {item.stock.volume.toLocaleString()}</div>
-                                    <div>Market Cap: ₹{(item.stock.marketCap ? (item.stock.marketCap / 10000000).toFixed(2) : "N/A")} Cr</div>
-                                  </div>
-                                  <div className="mt-3 flex justify-between">
-                                    <Button 
-                                      size="sm"
-                                      className="w-[48%] bg-green-500 hover:bg-green-600 text-white"
-                                      onClick={() => openTradeDialog(item.stock, 'BUY')}
-                                    >
-                                      <ShoppingCart className="w-3 h-3 mr-1" /> Buy
-                                    </Button>
-                                    <Button 
-                                      size="sm"
-                                      className="w-[48%] bg-red-500 hover:bg-red-600 text-white"
-                                      onClick={() => openTradeDialog(item.stock, 'SELL')}
-                                    >
-                                      <ArrowUpRight className="w-3 h-3 mr-1" /> Sell
-                                    </Button>
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          </motion.div>
-                        ))
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12 border border-dashed border-muted-foreground/20 rounded-lg">
-                      <Star className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium mb-2">This watchlist is empty</h3>
-                      <p className="text-muted-foreground mb-4">Add stocks to your watchlist by clicking the star icon</p>
-                      <Button 
-                        variant="outline" 
-                        onClick={() => setActiveTab("market")}
-                        className="mx-auto"
-                      >
-                        Browse Market
-                      </Button>
-                    </div>
-                  )}
-                </TabsContent>
+
               </Tabs>
             </>
           )}
@@ -3072,7 +3075,7 @@ export default function Dashboard() {
         
         {/* Bottom Navigation */}
         <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border shadow-lg">
-          <div className="grid grid-cols-4 h-16">
+          <div className="grid grid-cols-5 h-16">
             <Button 
               variant={activeSection === "home" ? "default" : "ghost"} 
               className={`flex flex-col items-center justify-center rounded-none h-full ${activeSection === "home" ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white" : "text-foreground hover:bg-green-500/5"}`}
@@ -3080,6 +3083,14 @@ export default function Dashboard() {
             >
               <Home className={`h-5 w-5 ${activeSection === "home" ? "" : "text-muted-foreground"}`} />
               <span className={`text-xs mt-1 ${activeSection === "home" ? "" : "text-muted-foreground"}`}>Home</span>
+            </Button>
+            <Button 
+              variant={activeSection === "watchlist" ? "default" : "ghost"} 
+              className={`flex flex-col items-center justify-center rounded-none h-full ${activeSection === "watchlist" ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white" : "text-foreground hover:bg-green-500/5"}`}
+              onClick={() => setActiveSection("watchlist")}
+            >
+              <Star className={`h-5 w-5 ${activeSection === "watchlist" ? "" : "text-muted-foreground"}`} />
+              <span className={`text-xs mt-1 ${activeSection === "watchlist" ? "" : "text-muted-foreground"}`}>Watchlist</span>
             </Button>
             <Button 
               variant={activeSection === "portfolio" ? "default" : "ghost"} 
