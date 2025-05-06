@@ -666,56 +666,77 @@ export default function AdminDashboard() {
       adminUser: localStorage.getItem('adminUser')
     });
     
-    // Simplified admin access check with fallbacks
+    // SIMPLIFIED ADMIN ACCESS CHECK - PRIORITIZE EMERGENCY ACCESS
     
-    // 1. Check for admin flags in storage first (most reliable)
+    // 1. First priority: Check for admin flags in storage (most reliable, especially for emergency access)
     const adminUserFlag = localStorage.getItem('adminUser') === 'true' || sessionStorage.getItem('adminUser') === 'true';
     
-    // 2. If admin flag is set, ensure it stays set and grant access
     if (adminUserFlag) {
       console.log('Admin flag detected in storage, granting admin access');
-      // Ensure both storage locations have the flag
-      localStorage.setItem('adminUser', 'true');
-      sessionStorage.setItem('adminUser', 'true');
-      return;
+      // Ensure both storage locations have the flag for redundancy
+      try {
+        localStorage.setItem('adminUser', 'true');
+        sessionStorage.setItem('adminUser', 'true');
+        // Refresh the login time to extend the session
+        sessionStorage.setItem('adminLoginTime', Date.now().toString());
+      } catch (e) {
+        console.error('Error setting admin flags:', e);
+        // Continue anyway
+      }
+      return; // Grant access immediately
     }
     
-    // 3. If auth is still initializing, wait
+    // 2. If auth is still initializing, wait
     if (initializing) {
       console.log('Auth still initializing, waiting...');
       return;
     }
     
-    // 4. Check for recent admin login attempt
+    // 3. Check for recent admin login attempt with extended time window (10 minutes)
     const adminLoginAttempt = sessionStorage.getItem('adminLoginAttempt') === 'true';
     const adminLoginTime = sessionStorage.getItem('adminLoginTime');
-    const isRecentAdminLogin = adminLoginTime && (Date.now() - parseInt(adminLoginTime)) < 300000; // Extended to 5 minutes
+    const isRecentAdminLogin = adminLoginTime && (Date.now() - parseInt(adminLoginTime)) < 600000; // 10 minutes
     
-    // 5. If there was a recent login attempt, grant temporary access
     if (adminLoginAttempt && isRecentAdminLogin) {
       console.log('Recent admin login detected, granting temporary access');
       // Set admin flag to ensure access
-      localStorage.setItem('adminUser', 'true');
-      sessionStorage.setItem('adminUser', 'true');
+      try {
+        localStorage.setItem('adminUser', 'true');
+        sessionStorage.setItem('adminUser', 'true');
+      } catch (e) {
+        console.error('Error setting admin flags:', e);
+        // Continue anyway
+      }
       return;
     }
     
-    // 6. If we have a user, check if it's the demo user or has admin role
+    // 4. If we have a user, check if it's the demo user or has admin role
     if (user) {
-      // Force demo@papertrader.app to be treated as admin regardless of metadata
-      if (user.email === "demo@papertrader.app" || user.email === "admin@papertrader.app") {
-        console.log('Demo/admin user detected, granting admin access');
-        // Ensure admin flags are set
-        localStorage.setItem('adminUser', 'true');
-        sessionStorage.setItem('adminUser', 'true');
+      // Force these emails to be treated as admin regardless of metadata
+      if (user.email === "demo@papertrader.app" || 
+          user.email === "admin@papertrader.app" || 
+          user.email?.includes('admin')) {
+        console.log('Admin email detected, granting admin access');
+        try {
+          localStorage.setItem('adminUser', 'true');
+          sessionStorage.setItem('adminUser', 'true');
+        } catch (e) {
+          console.error('Error setting admin flags:', e);
+          // Continue anyway
+        }
         return;
       }
       
       // Check for admin role in metadata
       if (user.user_metadata?.role === "ADMIN" || user.app_metadata?.role === "ADMIN") {
         console.log('Admin role detected in metadata, granting admin access');
-        localStorage.setItem('adminUser', 'true');
-        sessionStorage.setItem('adminUser', 'true');
+        try {
+          localStorage.setItem('adminUser', 'true');
+          sessionStorage.setItem('adminUser', 'true');
+        } catch (e) {
+          console.error('Error setting admin flags:', e);
+          // Continue anyway
+        }
         return;
       }
       
@@ -725,7 +746,7 @@ export default function AdminDashboard() {
       return;
     }
     
-    // 7. If no user and no admin flags, redirect to our static admin login
+    // 5. If no user and no admin flags, redirect to our static admin login
     console.log('No user or admin flags found, redirecting to admin login');
     window.location.href = '/admin-auth.html';
     

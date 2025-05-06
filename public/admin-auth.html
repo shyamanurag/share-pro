@@ -119,6 +119,8 @@
             <div id="success-message" class="success" style="display: none;"></div>
             <div class="links">
                 <a href="/login">Back to Regular Login</a>
+                <br />
+                <a href="/admin-bypass" style="color: #dc2626; margin-top: 10px; display: inline-block;">Try Alternative Admin Access</a>
             </div>
         </div>
     </div>
@@ -309,26 +311,56 @@
             }
         }
         
-        // Emergency admin access
+        // Emergency admin access - enhanced for reliability
         async function emergencyAdminAccess() {
             setLoading(true);
+            showSuccess('Processing emergency admin access...');
             
             try {
+                console.log('Starting emergency admin access procedure');
+                
                 // Clear browser state first
                 await clearBrowserState();
+                console.log('Browser state cleared');
                 
-                // Set admin flags directly
-                localStorage.setItem('adminUser', 'true');
-                sessionStorage.setItem('adminUser', 'true');
-                sessionStorage.setItem('adminLoginAttempt', 'true');
-                sessionStorage.setItem('adminLoginTime', Date.now().toString());
+                // Set admin flags directly with multiple approaches for redundancy
+                try {
+                    // Set in localStorage
+                    localStorage.setItem('adminUser', 'true');
+                    localStorage.setItem('adminLoginTime', Date.now().toString());
+                    
+                    // Set in sessionStorage
+                    sessionStorage.setItem('adminUser', 'true');
+                    sessionStorage.setItem('adminLoginAttempt', 'true');
+                    sessionStorage.setItem('adminLoginTime', Date.now().toString());
+                    
+                    console.log('Admin flags set in storage');
+                } catch (storageError) {
+                    console.error('Error setting storage flags:', storageError);
+                    // Continue anyway
+                }
                 
                 showSuccess('Emergency admin access granted! Redirecting to admin panel...');
+                console.log('Preparing to redirect to admin panel');
                 
-                // Redirect to admin page
-                setTimeout(() => {
-                    window.location.href = '/admin';
-                }, 1500);
+                // Use a more reliable redirect approach
+                try {
+                    // First attempt: standard location change
+                    setTimeout(() => {
+                        console.log('Redirecting to admin panel...');
+                        window.location.href = '/admin';
+                        
+                        // Backup redirect in case the first one fails
+                        setTimeout(() => {
+                            console.log('Backup redirect attempt');
+                            window.location.replace('/admin');
+                        }, 2000);
+                    }, 1500);
+                } catch (redirectError) {
+                    console.error('Redirect error:', redirectError);
+                    showError('Redirect failed. Please navigate to /admin manually.');
+                    setLoading(false);
+                }
             } catch (error) {
                 console.error('Emergency access error:', error);
                 showError('Failed to grant emergency access. Please try again.');
