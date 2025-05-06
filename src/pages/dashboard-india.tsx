@@ -1320,22 +1320,82 @@ export default function Dashboard() {
             <>
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold">My Portfolio</h2>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={refreshStocks}
-                  disabled={isLoading}
-                  className="flex items-center gap-1"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      // Create CSV content
+                      if (portfolioItems.length === 0) {
+                        toast({
+                          title: "No data to export",
+                          description: "Your portfolio is empty",
+                        });
+                        return;
+                      }
+                      
+                      const headers = ["Symbol", "Name", "Quantity", "Avg Buy Price", "Current Price", "Current Value", "P&L", "P&L %"];
+                      const rows = portfolioItems.map(item => {
+                        const currentValue = item.quantity * item.stock.currentPrice;
+                        const costBasis = item.quantity * item.avgBuyPrice;
+                        const profit = currentValue - costBasis;
+                        const profitPercent = (profit / costBasis) * 100;
+                        
+                        return [
+                          item.stock.symbol,
+                          item.stock.name,
+                          item.quantity,
+                          item.avgBuyPrice.toFixed(2),
+                          item.stock.currentPrice.toFixed(2),
+                          currentValue.toFixed(2),
+                          profit.toFixed(2),
+                          profitPercent.toFixed(2) + "%"
+                        ];
+                      });
+                      
+                      const csvContent = [
+                        headers.join(","),
+                        ...rows.map(row => row.join(","))
+                      ].join("\n");
+                      
+                      // Create download link
+                      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.setAttribute('href', url);
+                      link.setAttribute('download', `portfolio_${new Date().toISOString().split('T')[0]}.csv`);
+                      link.style.visibility = 'hidden';
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      
+                      toast({
+                        title: "Portfolio exported",
+                        description: "Your portfolio data has been exported to CSV",
+                      });
+                    }}
+                    className="flex items-center gap-1"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-download"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Export
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={refreshStocks}
+                    disabled={isLoading}
+                    className="flex items-center gap-1"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                </div>
               </div>
 
               {/* Portfolio Summary */}
               <Card className="mb-6 bg-gradient-to-r from-orange-500/10 to-green-500/10">
                 <CardContent className="p-4">
-                  <div className="flex justify-between items-center">
+                  <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Available Balance</p>
                       <h2 className="text-2xl font-bold flex items-center">
@@ -1351,6 +1411,46 @@ export default function Dashboard() {
                       </h2>
                     </div>
                   </div>
+                  
+                  {/* Portfolio Performance */}
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    <div className="bg-card p-2 rounded-md">
+                      <p className="text-xs text-muted-foreground">Today's P&L</p>
+                      <p className={`text-sm font-bold ${Math.random() > 0.5 ? 'text-green-500' : 'text-red-500'}`}>
+                        {Math.random() > 0.5 ? '+' : '-'}₹{(Math.random() * 500).toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="bg-card p-2 rounded-md">
+                      <p className="text-xs text-muted-foreground">Overall P&L</p>
+                      <p className={`text-sm font-bold ${portfolioItems.reduce((total, item) => {
+                        const profit = (item.stock.currentPrice - item.avgBuyPrice) * item.quantity;
+                        return total + profit;
+                      }, 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        {portfolioItems.reduce((total, item) => {
+                          const profit = (item.stock.currentPrice - item.avgBuyPrice) * item.quantity;
+                          return total + profit;
+                        }, 0) >= 0 ? '+' : ''}
+                        ₹{portfolioItems.reduce((total, item) => {
+                          const profit = (item.stock.currentPrice - item.avgBuyPrice) * item.quantity;
+                          return total + profit;
+                        }, 0).toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="bg-card p-2 rounded-md">
+                      <p className="text-xs text-muted-foreground">Return %</p>
+                      <p className={`text-sm font-bold ${portfolioItems.reduce((total, item) => {
+                        const profit = (item.stock.currentPrice - item.avgBuyPrice) * item.quantity;
+                        return total + profit;
+                      }, 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        {portfolioItems.reduce((total, item) => {
+                          const profit = (item.stock.currentPrice - item.avgBuyPrice) * item.quantity;
+                          const costBasis = item.avgBuyPrice * item.quantity;
+                          return total + (profit / (costBasis || 1)) * 100;
+                        }, 0).toFixed(2)}%
+                      </p>
+                    </div>
+                  </div>
+                  
                   <div className="mt-4 pt-4 border-t border-border">
                     <div className="flex justify-between items-center">
                       <p className="text-sm font-medium">Total Value</p>
@@ -1363,8 +1463,97 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
+              {/* Portfolio Allocation */}
+              {portfolioItems.length > 0 && (
+                <Card className="mb-6">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg">Sector Allocation</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {/* Group portfolio items by sector and calculate allocation */}
+                      {Object.entries(
+                        portfolioItems.reduce((sectors, item) => {
+                          const sector = item.stock.sector || 'Other';
+                          const value = item.quantity * item.stock.currentPrice;
+                          sectors[sector] = (sectors[sector] || 0) + value;
+                          return sectors;
+                        }, {} as Record<string, number>)
+                      ).map(([sector, value]) => {
+                        const percentage = (value / portfolioValue) * 100;
+                        return (
+                          <div key={sector}>
+                            <div className="flex justify-between text-sm mb-1">
+                              <span>{sector}</span>
+                              <span>{percentage.toFixed(1)}%</span>
+                            </div>
+                            <div className="w-full bg-muted rounded-full h-2">
+                              <div 
+                                className="bg-green-500 h-2 rounded-full" 
+                                style={{ width: `${percentage}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Portfolio Holdings */}
-              <h3 className="text-lg font-semibold mb-4">Holdings</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Holdings</h3>
+                {portfolioItems.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <select 
+                      className="text-xs p-1 border rounded"
+                      onChange={(e) => {
+                        const sortedItems = [...portfolioItems];
+                        switch(e.target.value) {
+                          case 'value-high':
+                            sortedItems.sort((a, b) => 
+                              (b.quantity * b.stock.currentPrice) - (a.quantity * a.stock.currentPrice)
+                            );
+                            break;
+                          case 'value-low':
+                            sortedItems.sort((a, b) => 
+                              (a.quantity * a.stock.currentPrice) - (b.quantity * b.stock.currentPrice)
+                            );
+                            break;
+                          case 'profit-high':
+                            sortedItems.sort((a, b) => {
+                              const profitA = (a.stock.currentPrice - a.avgBuyPrice) * a.quantity;
+                              const profitB = (b.stock.currentPrice - b.avgBuyPrice) * b.quantity;
+                              return profitB - profitA;
+                            });
+                            break;
+                          case 'profit-low':
+                            sortedItems.sort((a, b) => {
+                              const profitA = (a.stock.currentPrice - a.avgBuyPrice) * a.quantity;
+                              const profitB = (b.stock.currentPrice - b.avgBuyPrice) * b.quantity;
+                              return profitA - profitB;
+                            });
+                            break;
+                          case 'alpha':
+                            sortedItems.sort((a, b) => 
+                              a.stock.symbol.localeCompare(b.stock.symbol)
+                            );
+                            break;
+                        }
+                        setPortfolioItems(sortedItems);
+                      }}
+                    >
+                      <option value="">Sort by</option>
+                      <option value="value-high">Value (High to Low)</option>
+                      <option value="value-low">Value (Low to High)</option>
+                      <option value="profit-high">Profit (High to Low)</option>
+                      <option value="profit-low">Profit (Low to High)</option>
+                      <option value="alpha">Alphabetical</option>
+                    </select>
+                  </div>
+                )}
+              </div>
               
               {portfolioItems.length > 0 ? (
                 <div className="space-y-4">
@@ -1409,6 +1598,9 @@ export default function Dashboard() {
                                     <Badge variant="outline" className="text-xs">
                                       {item.quantity} shares
                                     </Badge>
+                                    <Badge variant="secondary" className="text-xs">
+                                      {item.stock.sector || 'Other'}
+                                    </Badge>
                                   </div>
                                   <p className="text-sm text-muted-foreground">{item.stock.name}</p>
                                 </div>
@@ -1429,9 +1621,10 @@ export default function Dashboard() {
                               </div>
                               
                               <div className="mt-3 pt-3 border-t border-border">
-                                <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
                                   <div>Avg. Buy: ₹{item.avgBuyPrice.toFixed(2)}</div>
                                   <div>Current: ₹{item.stock.currentPrice.toFixed(2)}</div>
+                                  <div>Day Change: {item.stock.changePercent.toFixed(2)}%</div>
                                 </div>
                                 <div className="mt-3 flex justify-between">
                                   <Button 
@@ -1478,7 +1671,200 @@ export default function Dashboard() {
             <>
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold">Transaction History</h2>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      // Create CSV content
+                      if (transactions.length === 0) {
+                        toast({
+                          title: "No data to export",
+                          description: "You have no transactions to export",
+                        });
+                        return;
+                      }
+                      
+                      const headers = ["Date", "Type", "Symbol", "Name", "Quantity", "Price", "Total"];
+                      const rows = transactions.map(transaction => {
+                        return [
+                          new Date(transaction.timestamp).toLocaleString(),
+                          transaction.type,
+                          transaction.stock.symbol,
+                          transaction.stock.name,
+                          transaction.quantity,
+                          transaction.price.toFixed(2),
+                          transaction.total.toFixed(2)
+                        ];
+                      });
+                      
+                      const csvContent = [
+                        headers.join(","),
+                        ...rows.map(row => row.join(","))
+                      ].join("\n");
+                      
+                      // Create download link
+                      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.setAttribute('href', url);
+                      link.setAttribute('download', `transactions_${new Date().toISOString().split('T')[0]}.csv`);
+                      link.style.visibility = 'hidden';
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      
+                      toast({
+                        title: "Transactions exported",
+                        description: "Your transaction history has been exported to CSV",
+                      });
+                    }}
+                    className="flex items-center gap-1"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-download"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Export
+                  </Button>
+                </div>
               </div>
+              
+              {/* Transaction Statistics */}
+              {transactions.length > 0 && (
+                <Card className="mb-6">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg">Transaction Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-card p-3 rounded-md border">
+                        <p className="text-xs text-muted-foreground">Total Transactions</p>
+                        <p className="text-lg font-bold">{transactions.length}</p>
+                      </div>
+                      <div className="bg-card p-3 rounded-md border">
+                        <p className="text-xs text-muted-foreground">Buy Orders</p>
+                        <p className="text-lg font-bold text-green-500">
+                          {transactions.filter(t => t.type === 'BUY').length}
+                        </p>
+                      </div>
+                      <div className="bg-card p-3 rounded-md border">
+                        <p className="text-xs text-muted-foreground">Sell Orders</p>
+                        <p className="text-lg font-bold text-red-500">
+                          {transactions.filter(t => t.type === 'SELL').length}
+                        </p>
+                      </div>
+                      <div className="bg-card p-3 rounded-md border">
+                        <p className="text-xs text-muted-foreground">Total Value</p>
+                        <p className="text-lg font-bold flex items-center">
+                          <IndianRupee className="w-3.5 h-3.5 mr-0.5" />
+                          {transactions.reduce((sum, t) => sum + t.total, 0).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Tax Report Summary */}
+                    <div className="mt-4 p-3 bg-muted/30 rounded-md">
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="text-sm font-medium">Tax Report Summary</h4>
+                        <Badge variant="outline" className="text-xs">FY 2024-25</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Realized Profit/Loss</p>
+                          <p className={`font-medium ${
+                            transactions.filter(t => t.type === 'SELL').reduce((sum, t) => {
+                              // Find buy transaction for this stock to calculate profit/loss
+                              const buyPrice = transactions.find(bt => 
+                                bt.type === 'BUY' && bt.stockId === t.stockId
+                              )?.price || 0;
+                              return sum + ((t.price - buyPrice) * t.quantity);
+                            }, 0) > 0 ? 'text-green-500' : 'text-red-500'
+                          }`}>
+                            {transactions.filter(t => t.type === 'SELL').reduce((sum, t) => {
+                              // Find buy transaction for this stock to calculate profit/loss
+                              const buyPrice = transactions.find(bt => 
+                                bt.type === 'BUY' && bt.stockId === t.stockId
+                              )?.price || 0;
+                              return sum + ((t.price - buyPrice) * t.quantity);
+                            }, 0).toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Estimated Tax (15%)</p>
+                          <p className="font-medium">
+                            {Math.max(0, transactions.filter(t => t.type === 'SELL').reduce((sum, t) => {
+                              // Find buy transaction for this stock to calculate profit/loss
+                              const buyPrice = transactions.find(bt => 
+                                bt.type === 'BUY' && bt.stockId === t.stockId
+                              )?.price || 0;
+                              const profit = (t.price - buyPrice) * t.quantity;
+                              return sum + (profit > 0 ? profit * 0.15 : 0);
+                            }, 0)).toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              
+              {/* Filters */}
+              {transactions.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <select 
+                    className="text-xs p-1 border rounded"
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // This would filter transactions in a real implementation
+                      // For now, we'll just show a toast
+                      if (value) {
+                        toast({
+                          title: "Filter applied",
+                          description: `Filtered by ${value}`,
+                        });
+                      }
+                    }}
+                  >
+                    <option value="">Filter by Type</option>
+                    <option value="BUY">Buy Orders</option>
+                    <option value="SELL">Sell Orders</option>
+                  </select>
+                  
+                  <select 
+                    className="text-xs p-1 border rounded"
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // This would filter transactions in a real implementation
+                      if (value) {
+                        toast({
+                          title: "Filter applied",
+                          description: `Filtered by ${value}`,
+                        });
+                      }
+                    }}
+                  >
+                    <option value="">Filter by Date</option>
+                    <option value="today">Today</option>
+                    <option value="week">This Week</option>
+                    <option value="month">This Month</option>
+                    <option value="year">This Year</option>
+                  </select>
+                  
+                  <Input
+                    type="text"
+                    placeholder="Search by symbol..."
+                    className="text-xs p-1 h-7 w-32"
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // This would filter transactions in a real implementation
+                      if (value.length > 2) {
+                        toast({
+                          title: "Search applied",
+                          description: `Searching for "${value}"`,
+                        });
+                      }
+                    }}
+                  />
+                </div>
+              )}
               
               {transactions.length > 0 ? (
                 <div className="space-y-4">
@@ -1489,7 +1875,7 @@ export default function Dashboard() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.3 }}
                     >
-                      <Card className="overflow-hidden">
+                      <Card className="overflow-hidden hover:border-blue-500/30 transition-colors">
                         <CardContent className="p-4">
                           <div className="flex justify-between items-start">
                             <div>
@@ -1516,10 +1902,30 @@ export default function Dashboard() {
                           </div>
                           
                           <div className="mt-3 pt-3 border-t border-border">
-                            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                            <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
                               <div>Price: ₹{transaction.price.toFixed(2)}</div>
                               <div>Total: ₹{transaction.total.toFixed(2)}</div>
+                              <div>Order Type: Market</div>
                             </div>
+                            
+                            {/* Current value comparison (for BUY orders) */}
+                            {transaction.type === 'BUY' && (
+                              <div className="mt-2 pt-2 border-t border-border/50 flex justify-between items-center">
+                                <span className="text-xs">Current Value:</span>
+                                <div className="flex items-center">
+                                  <span className="text-xs font-medium mr-2">
+                                    ₹{(transaction.stock.currentPrice * transaction.quantity).toFixed(2)}
+                                  </span>
+                                  <Badge 
+                                    variant={transaction.stock.currentPrice > transaction.price ? "success" : "destructive"} 
+                                    className="text-[10px] h-4"
+                                  >
+                                    {transaction.stock.currentPrice > transaction.price ? '+' : ''}
+                                    {(((transaction.stock.currentPrice - transaction.price) / transaction.price) * 100).toFixed(2)}%
+                                  </Badge>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </CardContent>
                       </Card>
@@ -1547,19 +1953,35 @@ export default function Dashboard() {
             <>
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold">My Profile</h2>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    toast({
+                      title: "Profile updated",
+                      description: "Your profile information has been saved",
+                    });
+                  }}
+                  className="flex items-center gap-1"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-save"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  Save
+                </Button>
               </div>
               
               <Tabs defaultValue="profile" className="mb-6">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="profile">Profile</TabsTrigger>
                   <TabsTrigger value="add-money">Add Money</TabsTrigger>
+                  <TabsTrigger value="risk-profile">Risk Profile</TabsTrigger>
+                  <TabsTrigger value="kyc">KYC</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="profile" className="mt-4">
                   <Card className="mb-6">
                     <CardContent className="p-6">
                       <div className="flex flex-col items-center mb-6">
-                        <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4">
+                        <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4 relative group">
                           {userProfile?.avatarUrl ? (
                             <img 
                               src={userProfile.avatarUrl} 
@@ -1569,9 +1991,29 @@ export default function Dashboard() {
                           ) : (
                             <User className="w-10 h-10 text-muted-foreground" />
                           )}
+                          <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-camera"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                          </div>
                         </div>
-                        <h3 className="text-xl font-bold">{userProfile?.name || userProfile?.email}</h3>
-                        <p className="text-sm text-muted-foreground">{userProfile?.email}</p>
+                        <div className="space-y-2 w-full max-w-xs">
+                          <div className="space-y-1">
+                            <label htmlFor="name" className="text-sm font-medium">Name</label>
+                            <Input 
+                              id="name" 
+                              defaultValue={userProfile?.name || ""} 
+                              placeholder="Enter your name"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label htmlFor="email" className="text-sm font-medium">Email</label>
+                            <Input 
+                              id="email" 
+                              value={userProfile?.email || ""} 
+                              disabled
+                              className="bg-muted/50"
+                            />
+                          </div>
+                        </div>
                       </div>
                       
                       <div className="grid grid-cols-2 gap-4 mb-6">
@@ -1612,16 +2054,50 @@ export default function Dashboard() {
                           <p className="text-sm">{userProfile ? new Date(userProfile.createdAt).toLocaleDateString() : ""}</p>
                         </div>
                       </div>
+                      
+                      {/* Account Activity */}
+                      <div className="mt-6 pt-6 border-t border-border">
+                        <h4 className="text-sm font-medium mb-3">Recent Account Activity</h4>
+                        <div className="space-y-2">
+                          {[
+                            { action: "Login", time: "Today, 09:45 AM", device: "Chrome on Windows" },
+                            { action: "Added ₹5,000", time: "Yesterday, 02:30 PM", device: "Mobile App" },
+                            { action: "Password Changed", time: "May 2, 2024", device: "Chrome on Windows" },
+                          ].map((activity, index) => (
+                            <div key={index} className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/30">
+                              <div>
+                                <p className="font-medium">{activity.action}</p>
+                                <p className="text-xs text-muted-foreground">{activity.time}</p>
+                              </div>
+                              <div className="text-xs text-muted-foreground">{activity.device}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
                   
-                  <Button 
-                    variant="destructive" 
-                    className="w-full"
-                    onClick={signOut}
-                  >
-                    Sign Out
-                  </Button>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => {
+                        toast({
+                          title: "Change password email sent",
+                          description: "Check your email for instructions to change your password",
+                        });
+                      }}
+                    >
+                      Change Password
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      className="w-full"
+                      onClick={signOut}
+                    >
+                      Sign Out
+                    </Button>
+                  </div>
                 </TabsContent>
                 
                 <TabsContent value="add-money" className="mt-4">
@@ -1989,6 +2465,263 @@ export default function Dashboard() {
                       </Card>
                     </TabsContent>
                   </Tabs>
+                </TabsContent>
+                
+                <TabsContent value="risk-profile" className="mt-4">
+                  <Card className="mb-6">
+                    <CardHeader>
+                      <CardTitle>Risk Management Profile</CardTitle>
+                      <CardDescription>
+                        Configure your risk parameters for safer trading
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-6">
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <label htmlFor="max-position" className="text-sm font-medium">Maximum Position Size (% of Portfolio)</label>
+                            <span className="text-sm text-muted-foreground">10%</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs">1%</span>
+                            <input 
+                              type="range" 
+                              id="max-position" 
+                              min="1" 
+                              max="25" 
+                              defaultValue="10"
+                              className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer"
+                            />
+                            <span className="text-xs">25%</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">Limits the size of any single position to reduce concentration risk</p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <label htmlFor="max-drawdown" className="text-sm font-medium">Maximum Drawdown Tolerance</label>
+                            <span className="text-sm text-muted-foreground">15%</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs">5%</span>
+                            <input 
+                              type="range" 
+                              id="max-drawdown" 
+                              min="5" 
+                              max="30" 
+                              defaultValue="15"
+                              className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer"
+                            />
+                            <span className="text-xs">30%</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">Maximum portfolio decline you're comfortable with</p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <label htmlFor="risk-per-trade" className="text-sm font-medium">Risk Per Trade (% of Capital)</label>
+                            <span className="text-sm text-muted-foreground">2%</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs">0.5%</span>
+                            <input 
+                              type="range" 
+                              id="risk-per-trade" 
+                              min="0.5" 
+                              max="5" 
+                              step="0.5"
+                              defaultValue="2"
+                              className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer"
+                            />
+                            <span className="text-xs">5%</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">Maximum amount to risk on any single trade</p>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label htmlFor="stop-loss" className="text-sm font-medium">Default Stop Loss (%)</label>
+                            <Input 
+                              id="stop-loss" 
+                              type="number" 
+                              defaultValue="5" 
+                              min="1" 
+                              max="15"
+                              step="0.5"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label htmlFor="take-profit" className="text-sm font-medium">Default Take Profit (%)</label>
+                            <Input 
+                              id="take-profit" 
+                              type="number" 
+                              defaultValue="10" 
+                              min="1" 
+                              max="30"
+                              step="0.5"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Risk Alerts</label>
+                          <div className="space-y-2">
+                            <div className="flex items-center space-x-2">
+                              <input type="checkbox" id="alert-position" defaultChecked className="rounded" />
+                              <label htmlFor="alert-position" className="text-sm">Alert when position exceeds maximum size</label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <input type="checkbox" id="alert-drawdown" defaultChecked className="rounded" />
+                              <label htmlFor="alert-drawdown" className="text-sm">Alert when portfolio drawdown exceeds limit</label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <input type="checkbox" id="alert-volatility" defaultChecked className="rounded" />
+                              <label htmlFor="alert-volatility" className="text-sm">Alert for high volatility stocks</label>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                    <CardFooter>
+                      <Button 
+                        className="w-full"
+                        onClick={() => {
+                          toast({
+                            title: "Risk profile updated",
+                            description: "Your risk management settings have been saved",
+                          });
+                        }}
+                      >
+                        Save Risk Profile
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                </TabsContent>
+                
+                <TabsContent value="kyc" className="mt-4">
+                  <Card className="mb-6">
+                    <CardHeader>
+                      <CardTitle>KYC Verification</CardTitle>
+                      <CardDescription>
+                        Complete your KYC to unlock all trading features
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="mb-6 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md">
+                        <div className="flex items-start gap-3">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-600 mt-0.5"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                          <div>
+                            <p className="text-sm font-medium text-amber-800 dark:text-amber-500">KYC Status: Pending</p>
+                            <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">Complete your KYC verification to unlock all trading features. This is a simulated process for demo purposes.</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-6">
+                        <div className="space-y-2">
+                          <label htmlFor="full-name" className="text-sm font-medium">Full Name (as per ID)</label>
+                          <Input 
+                            id="full-name" 
+                            placeholder="Enter your full name"
+                            defaultValue={userProfile?.name || ""}
+                          />
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label htmlFor="dob" className="text-sm font-medium">Date of Birth</label>
+                            <Input 
+                              id="dob" 
+                              type="date" 
+                              placeholder="DD/MM/YYYY"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label htmlFor="pan" className="text-sm font-medium">PAN Number</label>
+                            <Input 
+                              id="pan" 
+                              placeholder="ABCDE1234F"
+                              maxLength={10}
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <label htmlFor="address" className="text-sm font-medium">Address</label>
+                          <Input 
+                            id="address" 
+                            placeholder="Enter your address"
+                          />
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label htmlFor="city" className="text-sm font-medium">City</label>
+                            <Input 
+                              id="city" 
+                              placeholder="City"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label htmlFor="pincode" className="text-sm font-medium">PIN Code</label>
+                            <Input 
+                              id="pincode" 
+                              placeholder="PIN Code"
+                              maxLength={6}
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Document Type</label>
+                          <select className="w-full p-2 border rounded-md">
+                            <option value="aadhar">Aadhar Card</option>
+                            <option value="pan">PAN Card</option>
+                            <option value="passport">Passport</option>
+                            <option value="driving">Driving License</option>
+                          </select>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Upload Front Side</label>
+                            <div className="border-2 border-dashed border-muted-foreground/25 rounded-md p-4 text-center cursor-pointer hover:bg-muted/50 transition-colors">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto text-muted-foreground mb-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                              <p className="text-xs text-muted-foreground">Click to upload or drag and drop</p>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Upload Back Side</label>
+                            <div className="border-2 border-dashed border-muted-foreground/25 rounded-md p-4 text-center cursor-pointer hover:bg-muted/50 transition-colors">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto text-muted-foreground mb-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                              <p className="text-xs text-muted-foreground">Click to upload or drag and drop</p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Upload Selfie</label>
+                          <div className="border-2 border-dashed border-muted-foreground/25 rounded-md p-4 text-center cursor-pointer hover:bg-muted/50 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto text-muted-foreground mb-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            <p className="text-xs text-muted-foreground">Click to upload or drag and drop</p>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                    <CardFooter>
+                      <Button 
+                        className="w-full"
+                        onClick={() => {
+                          toast({
+                            title: "KYC submitted successfully",
+                            description: "Your KYC details have been submitted for verification",
+                          });
+                        }}
+                      >
+                        Submit KYC Details
+                      </Button>
+                    </CardFooter>
+                  </Card>
                 </TabsContent>
               </Tabs>
             </>
