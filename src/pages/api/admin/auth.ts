@@ -26,7 +26,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // First ensure the admin user exists
     try {
       console.log('Admin auth API: Creating/verifying admin user');
-      const adminResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/api/demo/create-admin-user`, {
+      // Use absolute URL for server-side API calls
+      const baseUrl = process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}` 
+        : process.env.NEXT_PUBLIC_CO_DEV_ENV === "preview"
+          ? "https://papertrader.preview.co.dev"
+          : "http://localhost:3000";
+          
+      const adminResponse = await fetch(`${baseUrl}/api/demo/create-admin-user`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

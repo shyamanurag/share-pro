@@ -114,6 +114,7 @@
             </div>
             <button id="login-btn" onclick="handleLogin()">Login</button>
             <button id="one-click-btn" onclick="handleOneClickLogin()">One-Click Admin Login</button>
+            <button id="emergency-btn" onclick="emergencyAdminAccess()" style="background-color: #dc2626; margin-top: 0.5rem;">Emergency Admin Access</button>
             <div id="error-message" class="error" style="display: none;"></div>
             <div id="success-message" class="success" style="display: none;"></div>
             <div class="links">
@@ -289,23 +290,33 @@
         function setLoading(isLoading) {
             const loginBtn = document.getElementById('login-btn');
             const oneClickBtn = document.getElementById('one-click-btn');
+            const emergencyBtn = document.getElementById('emergency-btn');
             
             if (isLoading) {
                 loginBtn.disabled = true;
                 oneClickBtn.disabled = true;
+                emergencyBtn.disabled = true;
                 loginBtn.innerHTML = '<span class="loading"></span> Logging in...';
                 oneClickBtn.innerHTML = '<span class="loading"></span> Logging in...';
+                emergencyBtn.innerHTML = '<span class="loading"></span> Processing...';
             } else {
                 loginBtn.disabled = false;
                 oneClickBtn.disabled = false;
+                emergencyBtn.disabled = false;
                 loginBtn.textContent = 'Login';
                 oneClickBtn.textContent = 'One-Click Admin Login';
+                emergencyBtn.textContent = 'Emergency Admin Access';
             }
         }
         
         // Emergency admin access
-        function emergencyAdminAccess() {
-            clearBrowserState().then(() => {
+        async function emergencyAdminAccess() {
+            setLoading(true);
+            
+            try {
+                // Clear browser state first
+                await clearBrowserState();
+                
                 // Set admin flags directly
                 localStorage.setItem('adminUser', 'true');
                 sessionStorage.setItem('adminUser', 'true');
@@ -318,23 +329,14 @@
                 setTimeout(() => {
                     window.location.href = '/admin';
                 }, 1500);
-            });
+            } catch (error) {
+                console.error('Emergency access error:', error);
+                showError('Failed to grant emergency access. Please try again.');
+                setLoading(false);
+            }
         }
         
-        // Add emergency admin access button
-        document.addEventListener('DOMContentLoaded', () => {
-            const linksDiv = document.querySelector('.links');
-            const emergencyLink = document.createElement('a');
-            emergencyLink.href = '#';
-            emergencyLink.textContent = 'Emergency Admin Access';
-            emergencyLink.style.marginLeft = '1rem';
-            emergencyLink.style.color = '#dc2626';
-            emergencyLink.onclick = (e) => {
-                e.preventDefault();
-                emergencyAdminAccess();
-            };
-            linksDiv.appendChild(emergencyLink);
-        });
+        // Emergency admin access is now a button at the top
     </script>
 </body>
 </html>
