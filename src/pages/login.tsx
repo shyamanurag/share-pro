@@ -97,7 +97,7 @@ const LoginPage = () => {
         try {
           console.log('Creating/verifying demo user before login');
           const timestamp = new Date().getTime(); // Add timestamp to prevent caching
-          await fetch(`/api/demo/create-demo-user?t=${timestamp}`, {
+          const response = await fetch(`/api/demo/create-demo-user?t=${timestamp}`, {
             method: 'POST',
             headers: {
               'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -105,8 +105,22 @@ const LoginPage = () => {
               'Expires': '0'
             },
           });
+          
+          const data = await response.json();
+          console.log('Demo user setup response:', data);
+          
+          if (!response.ok) {
+            throw new Error(data.error || 'Failed to set up demo user');
+          }
         } catch (demoError) {
           console.error('Error setting up demo user:', demoError);
+          toast({
+            variant: "destructive",
+            title: "Demo Setup Error",
+            description: "There was an error setting up the demo account. Please try again.",
+          });
+          setIsLoading(false);
+          return;
         }
       }
       
@@ -121,14 +135,53 @@ const LoginPage = () => {
       }
       
       // Wait a moment to ensure signout is complete
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Attempt sign in
-      await signIn(email, password);
-      console.log('Login successful, redirecting to dashboard');
+      // Create a fresh Supabase client to avoid any cached state
+      const freshSupabase = createClient();
       
-      // Use direct location change for more reliable navigation
-      window.location.href = '/dashboard-india';
+      // Try direct login with Supabase first
+      try {
+        console.log('Attempting direct login with Supabase');
+        const { data, error } = await freshSupabase.auth.signInWithPassword({
+          email,
+          password
+        });
+        
+        if (error) {
+          console.error('Direct Supabase login error:', error);
+          throw error;
+        }
+        
+        if (data.user) {
+          console.log('Direct login successful, user:', data.user);
+          
+          // If this is the demo user, set admin flag for admin access
+          if (email === 'demo@papertrader.app') {
+            localStorage.setItem('adminUser', 'true');
+            sessionStorage.setItem('adminUser', 'true');
+          }
+          
+          // Use direct location change for more reliable navigation
+          window.location.href = '/dashboard-india';
+          return;
+        }
+      } catch (directLoginError) {
+        console.error('Direct login attempt failed:', directLoginError);
+        // Continue to try with AuthContext signIn
+      }
+      
+      // Attempt sign in through AuthContext
+      try {
+        await signIn(email, password);
+        console.log('Login successful, redirecting to dashboard');
+        
+        // Use direct location change for more reliable navigation
+        window.location.href = '/dashboard-india';
+      } catch (signInError) {
+        console.error('AuthContext login error:', signInError);
+        throw signInError;
+      }
     } catch (error) {
       console.error('Login error:', error);
       toast({
@@ -197,18 +250,75 @@ const LoginPage = () => {
                   
                   try {
                     // Ensure demo user exists
-                    await fetch('/api/demo/create-demo-user', {
+                    const timestamp = new Date().getTime(); // Add timestamp to prevent caching
+                    const response = await fetch(`/api/demo/create-demo-user?t=${timestamp}`, {
                       method: 'POST',
+                      headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                      },
                     });
                     
-                    // Set demo credentials
-                    formik.setFieldValue('email', 'demo@papertrader.app');
-                    formik.setFieldValue('password', 'demo1234');
+                    const data = await response.json();
+                    console.log('Demo user setup response:', data);
                     
-                    // Submit form after a short delay to allow field values to update
-                    setTimeout(() => {
-                      handleLogin(e);
-                    }, 100);
+                    if (!response.ok) {
+                      throw new Error(data.error || 'Failed to set up demo user');
+                    }
+                    
+                    // Clear any existing auth state
+                    if (typeof window !== 'undefined') {
+                      localStorage.clear();
+                      sessionStorage.clear();
+                      
+                      // Unregister service workers
+                      if ('serviceWorker' in navigator) {
+                        const registrations = await navigator.serviceWorker.getRegistrations();
+                        for (const registration of registrations) {
+                          await registration.unregister();
+                        }
+                      }
+                      
+                      // Clear caches
+                      if ('caches' in window) {
+                        const cacheKeys = await caches.keys();
+                        await Promise.all(cacheKeys.map(key => caches.delete(key)));
+                      }
+                    }
+                    
+                    // Create a fresh Supabase client
+                    const freshSupabase = createClient();
+                    
+                    // Sign out first to ensure clean state
+                    await freshSupabase.auth.signOut();
+                    
+                    // Wait a moment to ensure signout is complete
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    // Try direct login with Supabase
+                    const { data: loginData, error: loginError } = await freshSupabase.auth.signInWithPassword({
+                      email: 'demo@papertrader.app',
+                      password: 'demo1234'
+                    });
+                    
+                    if (loginError) {
+                      console.error('Demo login error:', loginError);
+                      throw loginError;
+                    }
+                    
+                    if (loginData.user) {
+                      console.log('Demo login successful, user:', loginData.user);
+                      
+                      // Set admin flag for admin access
+                      localStorage.setItem('adminUser', 'true');
+                      sessionStorage.setItem('adminUser', 'true');
+                      
+                      // Use direct location change for more reliable navigation
+                      window.location.href = '/dashboard-india';
+                    } else {
+                      throw new Error('No user data returned from authentication');
+                    }
                   } catch (error) {
                     console.error('Error setting up demo account:', error);
                     toast({
@@ -221,8 +331,9 @@ const LoginPage = () => {
                 }}
                 variant="secondary"
                 className="bg-amber-500 hover:bg-amber-600 text-white"
+                disabled={isLoading}
               >
-                Try Demo Account
+                {isLoading ? "Setting up demo..." : "Try Demo Account"}
               </Button>
             </div>
             <form onSubmit={handleLogin}>

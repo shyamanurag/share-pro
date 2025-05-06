@@ -130,12 +130,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Create a fresh Supabase client to avoid any cached state
     const freshSupabase = createClient();
     
-    // Skip admin user creation API call as it's failing with permission issues
-    // Instead, we'll rely on the admin check in the admin.tsx page
-    if (email.includes('admin')) {
-      console.log('Admin login detected, skipping admin user creation API call');
-      // Wait a moment to ensure clean state
-      await new Promise(resolve => setTimeout(resolve, 500));
+    // If this is the demo user, ensure it exists first
+    if (email === 'demo@papertrader.app') {
+      try {
+        console.log('Creating/verifying demo user before login');
+        const timestamp = new Date().getTime(); // Add timestamp to prevent caching
+        const response = await fetch(`/api/demo/create-demo-user?t=${timestamp}`, {
+          method: 'POST',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          },
+        });
+        
+        const data = await response.json();
+        console.log('Demo user setup response:', data);
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to set up demo user');
+        }
+      } catch (demoError) {
+        console.error('Error setting up demo user:', demoError);
+        throw new Error('Failed to set up demo user: ' + (demoError instanceof Error ? demoError.message : 'Unknown error'));
+      }
     }
     
     // Now attempt to sign in with the fresh client
@@ -151,11 +169,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         const { data, error } = await freshSupabase.auth.signInWithPassword({ 
           email, 
-          password,
-          options: {
-            // Don't use redirectTo for admin users, we'll handle that manually
-            redirectTo: email.includes('admin') ? undefined : `${window.location.origin}/dashboard-india`
-          }
+          password
         });
         
         if (error) {
@@ -170,15 +184,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (data.user) {
           console.log('Sign in successful, user data:', data.user);
           
-          // For admin users, ensure they have the admin role
-          if (email.includes('admin')) {
-            console.log('Admin user detected, updating metadata');
+          // For admin or demo users, ensure they have the admin role
+          if (email.includes('admin') || email === 'demo@papertrader.app') {
+            console.log('Admin/demo user detected, updating metadata');
             // Always update user metadata to include admin role
             try {
               await freshSupabase.auth.updateUser({
                 data: { role: 'ADMIN' }
               });
               console.log('Admin role set in user metadata');
+              
+              // Set admin flags in storage
+              localStorage.setItem('adminUser', 'true');
+              sessionStorage.setItem('adminUser', 'true');
             } catch (updateError) {
               console.error('Error updating user metadata:', updateError);
               // Continue anyway
