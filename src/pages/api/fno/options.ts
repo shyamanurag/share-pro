@@ -26,20 +26,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         SELECT 
           oc.id, 
           oc.type, 
-          oc.strike_price as "strikePrice", 
-          oc.premium_price as "premiumPrice", 
-          oc.expiry_date as "expiryDate", 
-          oc.lot_size as "lotSize",
+          oc."strikePrice", 
+          oc."premiumPrice", 
+          oc."expiryDate", 
+          oc."lotSize",
           s.id as "stockId", 
           s.symbol, 
           s.name, 
-          s.current_price as "currentPrice"
+          s."currentPrice"
         FROM "OptionsContract" oc
-        JOIN "Stock" s ON oc.stock_id = s.id
-        WHERE oc.stock_id = ${stockId as string}
+        JOIN "Stock" s ON oc."stockId" = s.id
+        WHERE oc."stockId" = ${stockId as string}
         AND oc.type = ${type as string}
-        AND oc.expiry_date > ${currentDate}
-        ORDER BY oc.expiry_date ASC, oc.strike_price ASC
+        AND oc."expiryDate" > ${currentDate}
+        ORDER BY oc."expiryDate" ASC, oc."strikePrice" ASC
       `;
 
       // If no contracts found, generate some mock contracts

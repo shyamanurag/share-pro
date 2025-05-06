@@ -21,19 +21,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const futuresContracts = await prisma.$queryRaw`
         SELECT 
           fc.id, 
-          fc.contract_price as "contractPrice", 
-          fc.expiry_date as "expiryDate", 
-          fc.lot_size as "lotSize", 
-          fc.margin_required as "marginRequired",
+          fc."contractPrice", 
+          fc."expiryDate", 
+          fc."lotSize", 
+          fc."marginRequired",
           s.id as "stockId", 
           s.symbol, 
           s.name, 
-          s.current_price as "currentPrice"
+          s."currentPrice"
         FROM "FuturesContract" fc
-        JOIN "Stock" s ON fc.stock_id = s.id
-        WHERE fc.stock_id = ${stockId as string}
-        AND fc.expiry_date > ${currentDate}
-        ORDER BY fc.expiry_date ASC
+        JOIN "Stock" s ON fc."stockId" = s.id
+        WHERE fc."stockId" = ${stockId as string}
+        AND fc."expiryDate" > ${currentDate}
+        ORDER BY fc."expiryDate" ASC
       `;
 
       // If no contracts found, generate some mock contracts
