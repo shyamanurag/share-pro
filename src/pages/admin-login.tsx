@@ -28,34 +28,30 @@ const AdminLoginPage = () => {
       // First, clear everything
       await clearBrowserState();
       
-      // Ensure admin user exists first
-      try {
-        console.log('Creating/verifying admin user before login');
-        const timestamp = new Date().getTime(); // Add timestamp to prevent caching
-        const response = await fetch(`/api/demo/create-admin-user?t=${timestamp}`, {
-          method: 'POST',
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-          },
-        });
-        
-        const data = await response.json();
-        console.log('Admin user setup response:', data);
-        
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to set up admin user');
-        }
-      } catch (adminError) {
-        console.error('Error setting up admin user:', adminError);
-        throw new Error('Failed to set up admin user: ' + (adminError instanceof Error ? adminError.message : 'Unknown error'));
+      // Use the dedicated admin auth API endpoint
+      console.log('Calling admin auth API endpoint');
+      const response = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        body: JSON.stringify({
+          email: 'admin@papertrader.app',
+          password: 'admin1234'
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error('Admin auth API error:', data);
+        throw new Error(data.error || 'Failed to authenticate admin user');
       }
       
-      // Use AuthContext's signIn method which now handles admin user setup
-      await signIn('admin@papertrader.app', 'admin1234');
-      
-      console.log('Admin sign in successful');
+      console.log('Admin sign in successful via API');
       
       // Store admin flags
       localStorage.setItem('adminUser', 'true');
@@ -171,10 +167,27 @@ const AdminLoginPage = () => {
       // Clear everything first
       await clearBrowserState();
       
-      // Use AuthContext's signIn method which now handles admin user setup
-      await signIn(email, password);
+      // Use the dedicated admin auth API endpoint
+      console.log('Calling admin auth API endpoint with provided credentials');
+      const response = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        body: JSON.stringify({ email, password })
+      });
       
-      console.log('Sign in successful');
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error('Admin auth API error:', data);
+        throw new Error(data.error || 'Failed to authenticate admin user');
+      }
+      
+      console.log('Sign in successful via API');
       
       // Store admin flags in both localStorage and sessionStorage for redundancy
       localStorage.setItem('adminUser', 'true');

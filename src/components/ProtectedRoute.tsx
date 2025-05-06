@@ -29,8 +29,11 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
       
       // Special case for admin routes - simplified logic
       if (isAdminRoute) {
-        // If trying to access admin login page, always allow it
+        // If trying to access admin login page, redirect to our static HTML version
         if (router.pathname === '/admin-login') {
+          console.log('Redirecting to static admin login page');
+          setIsNavigating(true);
+          window.location.href = '/admin-auth.html';
           return;
         }
         

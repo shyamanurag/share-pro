@@ -647,7 +647,9 @@ export default function AdminDashboard() {
     user.email === "admin@papertrader.app" || 
     user.email === "demo@papertrader.app" || 
     user.user_metadata?.role === "ADMIN" ||
-    user.app_metadata?.role === "ADMIN"
+    user.app_metadata?.role === "ADMIN" ||
+    localStorage.getItem('adminUser') === 'true' ||
+    sessionStorage.getItem('adminUser') === 'true'
   );
 
   useEffect(() => {
@@ -687,7 +689,7 @@ export default function AdminDashboard() {
     // 4. Check for recent admin login attempt
     const adminLoginAttempt = sessionStorage.getItem('adminLoginAttempt') === 'true';
     const adminLoginTime = sessionStorage.getItem('adminLoginTime');
-    const isRecentAdminLogin = adminLoginTime && (Date.now() - parseInt(adminLoginTime)) < 120000; // Within 2 minutes
+    const isRecentAdminLogin = adminLoginTime && (Date.now() - parseInt(adminLoginTime)) < 300000; // Extended to 5 minutes
     
     // 5. If there was a recent login attempt, grant temporary access
     if (adminLoginAttempt && isRecentAdminLogin) {
@@ -723,9 +725,9 @@ export default function AdminDashboard() {
       return;
     }
     
-    // 7. If no user and no admin flags, redirect to login
+    // 7. If no user and no admin flags, redirect to our static admin login
     console.log('No user or admin flags found, redirecting to admin login');
-    window.location.href = '/admin-login';
+    window.location.href = '/admin-auth.html';
     
   }, [user, isAdmin, initializing]);
 
