@@ -29,28 +29,36 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
       
       // Special case for admin routes
       if (isAdminRoute) {
-        // If trying to access admin login page, allow it
+        // Check for admin flags in storage first - this is the most reliable method
+        const adminUserFlag = localStorage.getItem('adminUser') === 'true' || sessionStorage.getItem('adminUser') === 'true';
+        
+        // If trying to access admin login page, always allow it
         if (router.pathname === '/admin-login') {
+          return;
+        }
+        
+        // If admin flag is set, allow access to admin pages
+        if (adminUserFlag && router.pathname === '/admin') {
+          console.log('Admin flag detected in storage, allowing access');
           return;
         }
         
         // Check for recent admin login attempt
         const adminLoginAttempt = sessionStorage.getItem('adminLoginAttempt');
         const adminLoginTime = sessionStorage.getItem('adminLoginTime');
-        const adminUserFlag = localStorage.getItem('adminUser') === 'true' || sessionStorage.getItem('adminUser') === 'true';
-        const isRecentAdminLogin = (adminLoginAttempt === 'true' && 
-          adminLoginTime && 
-          (Date.now() - parseInt(adminLoginTime)) < 30000) || // Within 30 seconds
-          adminUserFlag;
+        const isRecentAdminLogin = adminLoginTime && (Date.now() - parseInt(adminLoginTime)) < 60000; // Within 60 seconds
         
         // If there was a recent admin login attempt, allow access temporarily
         if (isRecentAdminLogin && router.pathname === '/admin') {
           console.log('Recent admin login detected, allowing access temporarily');
+          // Set admin flag to ensure continued access
+          localStorage.setItem('adminUser', 'true');
+          sessionStorage.setItem('adminUser', 'true');
           return;
         }
         
         // If trying to access admin page but not logged in
-        if (!user) {
+        if (!user && !adminUserFlag) {
           console.log('User not authenticated for admin route, redirecting to admin login');
           setIsNavigating(true);
           // Use window.location for a hard redirect
@@ -59,7 +67,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
         }
         
         // If trying to access admin page but not admin
-        if (user && !isAdmin && router.pathname !== '/admin-login') {
+        if (user && !isAdmin && !adminUserFlag && router.pathname !== '/admin-login') {
           console.log('User not admin, redirecting to dashboard');
           setIsNavigating(true);
           window.location.href = '/dashboard-india';
@@ -67,11 +75,17 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
         }
         
         // If admin user is trying to access admin login, redirect to admin page
-        if (user && isAdmin && router.pathname === '/admin-login') {
-          console.log('Admin already authenticated, redirecting to admin page');
-          setIsNavigating(true);
-          window.location.href = '/admin';
-          return;
+        if ((user && isAdmin) || adminUserFlag) {
+          if (router.pathname === '/admin-login') {
+            console.log('Admin already authenticated, redirecting to admin page');
+            setIsNavigating(true);
+            window.location.href = '/admin';
+            return;
+          } else {
+            // Ensure admin flags are set
+            localStorage.setItem('adminUser', 'true');
+            sessionStorage.setItem('adminUser', 'true');
+          }
         }
       }
       

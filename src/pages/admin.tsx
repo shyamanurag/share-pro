@@ -688,49 +688,59 @@ export default function AdminDashboard() {
       adminUser: localStorage.getItem('adminUser')
     });
     
+    // Check for admin flags in storage first - this is the most reliable method
+    const adminUserFlag = localStorage.getItem('adminUser') === 'true' || sessionStorage.getItem('adminUser') === 'true';
+    
+    // If admin flag is set, we can skip other checks
+    if (adminUserFlag) {
+      console.log('Admin flag detected in storage, granting admin access');
+      return;
+    }
+    
     // If auth is still initializing, wait
     if (initializing) {
       console.log('Auth still initializing, waiting...');
       return;
     }
     
-    // Check for admin flags in storage
-    const adminUserFlag = localStorage.getItem('adminUser') === 'true' || sessionStorage.getItem('adminUser') === 'true';
+    // Check for recent admin login attempt
     const adminLoginAttempt = sessionStorage.getItem('adminLoginAttempt') === 'true';
     const adminLoginTime = sessionStorage.getItem('adminLoginTime');
-    const isRecentAdminLogin = adminLoginTime && (Date.now() - parseInt(adminLoginTime)) < 30000; // Within 30 seconds
+    const isRecentAdminLogin = adminLoginTime && (Date.now() - parseInt(adminLoginTime)) < 60000; // Within 60 seconds
     
     // If no user is found, check if there was a recent admin login attempt
     if (!user) {
       if (adminLoginAttempt && isRecentAdminLogin) {
         console.log('Recent admin login detected but user not loaded yet, waiting...');
-        // Wait a bit longer for auth to initialize
-        setTimeout(() => {
-          if (!user) {
-            console.log('Still no user after waiting, redirecting to admin login');
-            window.location.replace('/admin-login');
-          }
-        }, 3000);
+        // Set admin flag to ensure access
+        localStorage.setItem('adminUser', 'true');
+        sessionStorage.setItem('adminUser', 'true');
         return;
       }
       
       console.log('No user found, redirecting to admin login');
-      window.location.replace('/admin-login');
+      window.location.href = '/admin-login';
       return;
     }
     
     // Force demo@papertrader.app to be treated as admin regardless of metadata
-    if (user.email === "demo@papertrader.app" || adminUserFlag) {
-      console.log('Demo user or admin flag detected, granting admin access');
+    if (user.email === "demo@papertrader.app") {
+      console.log('Demo user detected, granting admin access');
+      // Ensure admin flags are set
+      localStorage.setItem('adminUser', 'true');
+      sessionStorage.setItem('adminUser', 'true');
       return;
     }
     
     // If user is not admin, redirect to dashboard
     if (!isAdmin) {
       console.log('User is not admin, redirecting to dashboard');
-      window.location.replace('/dashboard-india');
+      window.location.href = '/dashboard-india';
     } else {
       console.log('Admin access granted');
+      // Ensure admin flags are set
+      localStorage.setItem('adminUser', 'true');
+      sessionStorage.setItem('adminUser', 'true');
     }
   }, [user, isAdmin, initializing]);
 

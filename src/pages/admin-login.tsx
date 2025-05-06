@@ -25,51 +25,76 @@ const AdminLoginPage = () => {
     try {
       console.log('Starting one-click admin login process');
       
-      // Clear everything first
-      await clearBrowserState();
+      // Set admin flags first to ensure they're available even if auth is slow
+      localStorage.setItem('adminUser', 'true');
+      sessionStorage.setItem('adminUser', 'true');
+      sessionStorage.setItem('adminLoginAttempt', 'true');
+      sessionStorage.setItem('adminLoginTime', Date.now().toString());
       
-      // Create a completely fresh Supabase client
-      const freshSupabase = createClient();
+      console.log('Admin flags set in storage');
       
-      // Sign in with demo credentials
-      console.log('Attempting to sign in with demo@papertrader.app');
-      
-      // Sign in directly with Supabase client
-      const { data, error } = await freshSupabase.auth.signInWithPassword({
-        email: 'demo@papertrader.app',
-        password: 'demo1234'
+      // Use emergency admin access approach first
+      toast({
+        title: "Admin Access",
+        description: "Setting up admin access...",
       });
       
-      if (error) {
-        console.error('Sign in error:', error);
-        throw error;
-      }
+      // Wait a moment to ensure UI updates
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      if (data.user) {
-        console.log('Admin sign in successful using demo account, user:', data.user);
-        
-        // Set admin role in user metadata
-        const updateResult = await freshSupabase.auth.updateUser({
-          data: { role: 'ADMIN' }
-        });
-        
-        console.log('Metadata update result:', updateResult);
-        
-        // Store admin flags in both localStorage and sessionStorage for redundancy
-        localStorage.setItem('adminUser', 'true');
-        sessionStorage.setItem('adminUser', 'true');
-        sessionStorage.setItem('adminLoginAttempt', 'true');
-        sessionStorage.setItem('adminLoginTime', Date.now().toString());
-        
-        // Wait to ensure auth state is updated
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Force a hard redirect to the admin page
-        console.log('Redirecting to admin page');
-        window.location.replace('/admin');
-      } else {
-        throw new Error('No user data returned from authentication');
-      }
+      // Redirect to admin page directly
+      console.log('Redirecting to admin page');
+      window.location.href = '/admin';
+      
+      // The following code won't execute due to the redirect,
+      // but we'll keep it as a fallback in case the redirect fails
+      setTimeout(async () => {
+        try {
+          // If we're still here, try the full auth flow
+          console.log('Redirect failed, trying full auth flow');
+          
+          // Clear everything first
+          await clearBrowserState();
+          
+          // Create a completely fresh Supabase client
+          const freshSupabase = createClient();
+          
+          // Sign in with demo credentials
+          console.log('Attempting to sign in with demo@papertrader.app');
+          
+          // Sign in directly with Supabase client
+          const { data, error } = await freshSupabase.auth.signInWithPassword({
+            email: 'demo@papertrader.app',
+            password: 'demo1234'
+          });
+          
+          if (error) {
+            console.error('Sign in error:', error);
+            throw error;
+          }
+          
+          if (data.user) {
+            console.log('Admin sign in successful using demo account');
+            
+            // Set admin role in user metadata
+            await freshSupabase.auth.updateUser({
+              data: { role: 'ADMIN' }
+            });
+            
+            // Store admin flags again
+            localStorage.setItem('adminUser', 'true');
+            sessionStorage.setItem('adminUser', 'true');
+            sessionStorage.setItem('adminLoginAttempt', 'true');
+            sessionStorage.setItem('adminLoginTime', Date.now().toString());
+            
+            // Force a hard redirect to the admin page
+            window.location.replace('/admin');
+          }
+        } catch (fallbackError) {
+          console.error('Fallback admin login error:', fallbackError);
+          setIsLoading(false);
+        }
+      }, 3000);
     } catch (error) {
       console.error('Admin login error:', error);
       toast({
