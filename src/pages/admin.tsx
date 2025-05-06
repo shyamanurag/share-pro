@@ -2942,6 +2942,15 @@ export default function AdminDashboard() {
                       <IndianRupee className="w-4 h-4 mr-1" />
                       Replace with Indian Stocks
                     </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex items-center gap-1"
+                      onClick={() => router.push('/admin/replace-stocks')}
+                    >
+                      <IndianRupee className="w-4 h-4 mr-1" />
+                      Stock Replacement Page
+                    </Button>
                     <Button variant="outline" size="sm" className="flex items-center gap-1">
                       <RefreshCw className="w-4 h-4" />
                       Refresh
