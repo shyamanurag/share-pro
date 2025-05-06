@@ -128,6 +128,27 @@ export default function AdvancedTrading() {
     leverage: 2,
   });
 
+  // Futures Trading state
+  const [futuresState, setFuturesState] = useState({
+    type: "BUY",
+    quantity: 1,
+    selectedContractId: "",
+  });
+
+  // Options Trading state
+  const [optionsState, setOptionsState] = useState({
+    type: "BUY",
+    quantity: 1,
+    selectedContractId: "",
+    optionType: "CALL", // "CALL" or "PUT"
+    strikePrice: 0,
+    expiryDate: "",
+  });
+
+  // Available contracts
+  const [futuresContracts, setFuturesContracts] = useState<any[]>([]);
+  const [optionsContracts, setOptionsContracts] = useState<any[]>([]);
+
   // Calculation results
   const [positionCalcResult, setPositionCalcResult] = useState<any>(null);
   const [backtestResult, setBacktestResult] = useState<any>(null);
@@ -225,6 +246,152 @@ export default function AdvancedTrading() {
     }
   };
 
+  // Fetch futures contracts
+  const fetchFuturesContracts = async () => {
+    if (!selectedStock) return;
+    
+    try {
+      setIsLoading(true);
+      const response = await fetch(`/api/fno/futures?stockId=${selectedStock.id}`);
+      if (!response.ok) throw new Error('Failed to fetch futures contracts');
+      const data = await response.json();
+      setFuturesContracts(data.futuresContracts);
+      
+      // Set default selected contract if available
+      if (data.futuresContracts.length > 0) {
+        setFuturesState(prev => ({
+          ...prev,
+          selectedContractId: data.futuresContracts[0].id,
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching futures contracts:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to fetch futures contracts",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fetch options contracts
+  const fetchOptionsContracts = async () => {
+    if (!selectedStock) return;
+    
+    try {
+      setIsLoading(true);
+      const response = await fetch(`/api/fno/options?stockId=${selectedStock.id}&type=${optionsState.optionType}`);
+      if (!response.ok) throw new Error('Failed to fetch options contracts');
+      const data = await response.json();
+      setOptionsContracts(data.optionsContracts);
+      
+      // Set default selected contract if available
+      if (data.optionsContracts.length > 0) {
+        setOptionsState(prev => ({
+          ...prev,
+          selectedContractId: data.optionsContracts[0].id,
+          strikePrice: data.optionsContracts[0].strikePrice,
+          expiryDate: data.optionsContracts[0].expiryDate,
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching options contracts:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to fetch options contracts",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Execute futures trade
+  const executeFuturesTrade = async () => {
+    if (!selectedStock || !futuresState.selectedContractId) return;
+    
+    try {
+      setIsLoading(true);
+      
+      const response = await fetch('/api/fno/futures', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          futuresContractId: futuresState.selectedContractId,
+          quantity: futuresState.quantity,
+          type: futuresState.type,
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to execute futures trade');
+      }
+      
+      const data = await response.json();
+      
+      toast({
+        title: "Futures Trade Executed",
+        description: data.message,
+      });
+    } catch (error: any) {
+      console.error('Error executing futures trade:', error);
+      toast({
+        variant: "destructive",
+        title: "Trade Failed",
+        description: error.message || "Failed to execute futures trade",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Execute options trade
+  const executeOptionsTrade = async () => {
+    if (!selectedStock || !optionsState.selectedContractId) return;
+    
+    try {
+      setIsLoading(true);
+      
+      const response = await fetch('/api/fno/options', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          optionsContractId: optionsState.selectedContractId,
+          quantity: optionsState.quantity,
+          type: optionsState.type,
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to execute options trade');
+      }
+      
+      const data = await response.json();
+      
+      toast({
+        title: "Options Trade Executed",
+        description: data.message,
+      });
+    } catch (error: any) {
+      console.error('Error executing options trade:', error);
+      toast({
+        variant: "destructive",
+        title: "Trade Failed",
+        description: error.message || "Failed to execute options trade",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Load initial data
   useEffect(() => {
     if (user) {
@@ -233,6 +400,21 @@ export default function AdvancedTrading() {
       fetchMarginInfo();
     }
   }, [user]);
+
+  // Fetch futures and options contracts when stock changes
+  useEffect(() => {
+    if (selectedStock) {
+      fetchFuturesContracts();
+      fetchOptionsContracts();
+    }
+  }, [selectedStock]);
+
+  // Fetch options contracts when option type changes
+  useEffect(() => {
+    if (selectedStock) {
+      fetchOptionsContracts();
+    }
+  }, [optionsState.optionType]);
 
   // Update stop loss price when entry price or percentage changes
   useEffect(() => {
@@ -855,10 +1037,12 @@ export default function AdvancedTrading() {
             
             <TabsContent value="order-types">
               <Tabs defaultValue="trailing-stop">
-                <TabsList className="grid grid-cols-3 mb-4">
+                <TabsList className="grid grid-cols-5 mb-4">
                   <TabsTrigger value="trailing-stop">Trailing Stop</TabsTrigger>
                   <TabsTrigger value="oco">OCO Orders</TabsTrigger>
                   <TabsTrigger value="margin">Margin Trading</TabsTrigger>
+                  <TabsTrigger value="futures">Futures</TabsTrigger>
+                  <TabsTrigger value="options">Options</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="trailing-stop">
@@ -1329,6 +1513,460 @@ export default function AdvancedTrading() {
                           <>
                             <Gauge className="mr-2 h-4 w-4" />
                             Execute Margin Trade
+                          </>
+                        )}
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                </TabsContent>
+                
+                <TabsContent value="futures">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <ArrowUpDown className="w-5 h-5 mr-2" />
+                        Futures Trading
+                      </CardTitle>
+                      <CardDescription>
+                        Trade futures contracts with leverage and settlement at a future date
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {/* Contract Selection */}
+                        <div className="space-y-2">
+                          <Label htmlFor="futures-contract">Select Futures Contract</Label>
+                          <Select 
+                            value={futuresState.selectedContractId} 
+                            onValueChange={(value) => setFuturesState(prev => ({ ...prev, selectedContractId: value }))}
+                          >
+                            <SelectTrigger id="futures-contract">
+                              <SelectValue placeholder="Select a futures contract" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {futuresContracts.map(contract => (
+                                <SelectItem key={contract.id} value={contract.id}>
+                                  {contract.stock.symbol} - {new Date(contract.expiryDate).toLocaleDateString()} - ₹{contract.contractPrice.toFixed(2)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        {/* Selected Contract Details */}
+                        {futuresState.selectedContractId && futuresContracts.length > 0 && (
+                          <div className="p-3 bg-muted rounded-md">
+                            <h3 className="font-semibold mb-2">Contract Details</h3>
+                            {(() => {
+                              const contract = futuresContracts.find(c => c.id === futuresState.selectedContractId);
+                              if (!contract) return null;
+                              
+                              return (
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                  <div>
+                                    <p className="text-muted-foreground">Stock</p>
+                                    <p className="font-bold">{contract.stock.symbol}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Expiry Date</p>
+                                    <p className="font-bold">{new Date(contract.expiryDate).toLocaleDateString()}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Contract Price</p>
+                                    <p className="font-bold flex items-center">
+                                      <IndianRupee className="w-3 h-3 mr-0.5" />
+                                      {contract.contractPrice.toFixed(2)}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Lot Size</p>
+                                    <p className="font-bold">{contract.lotSize}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Margin Required</p>
+                                    <p className="font-bold flex items-center">
+                                      <IndianRupee className="w-3 h-3 mr-0.5" />
+                                      {contract.marginRequired.toFixed(2)}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Premium/Discount</p>
+                                    <p className={`font-bold ${contract.contractPrice > contract.stock.currentPrice ? 'text-green-500' : 'text-red-500'}`}>
+                                      {contract.contractPrice > contract.stock.currentPrice ? '+' : ''}
+                                      {((contract.contractPrice / contract.stock.currentPrice - 1) * 100).toFixed(2)}%
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
+                        
+                        {/* Order Type */}
+                        <div className="space-y-2">
+                          <Label>Order Type</Label>
+                          <div className="flex space-x-2">
+                            <Button
+                              variant={futuresState.type === "BUY" ? "default" : "outline"}
+                              className={futuresState.type === "BUY" ? "w-1/2 bg-green-500 hover:bg-green-600" : "w-1/2"}
+                              onClick={() => setFuturesState(prev => ({ ...prev, type: "BUY" }))}
+                            >
+                              Buy
+                            </Button>
+                            <Button
+                              variant={futuresState.type === "SELL" ? "default" : "outline"}
+                              className={futuresState.type === "SELL" ? "w-1/2 bg-red-500 hover:bg-red-600" : "w-1/2"}
+                              onClick={() => setFuturesState(prev => ({ ...prev, type: "SELL" }))}
+                            >
+                              Sell
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        {/* Quantity (in lots) */}
+                        <div className="space-y-2">
+                          <Label htmlFor="futures-quantity">Quantity (Lots)</Label>
+                          <Input
+                            id="futures-quantity"
+                            type="number"
+                            min="1"
+                            value={futuresState.quantity}
+                            onChange={(e) => setFuturesState(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
+                          />
+                        </div>
+                        
+                        {/* Trade Summary */}
+                        {futuresState.selectedContractId && futuresContracts.length > 0 && (
+                          <div className="p-3 bg-muted rounded-md">
+                            <h3 className="font-semibold mb-2">Trade Summary</h3>
+                            {(() => {
+                              const contract = futuresContracts.find(c => c.id === futuresState.selectedContractId);
+                              if (!contract) return null;
+                              
+                              const totalValue = contract.contractPrice * contract.lotSize * futuresState.quantity;
+                              const marginRequired = contract.marginRequired * futuresState.quantity;
+                              const leverage = totalValue / marginRequired;
+                              
+                              return (
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex justify-between">
+                                    <span>Total Contract Value:</span>
+                                    <span className="font-bold flex items-center">
+                                      <IndianRupee className="w-3 h-3 mr-0.5" />
+                                      {totalValue.toFixed(2)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Margin Required:</span>
+                                    <span className="font-bold flex items-center">
+                                      <IndianRupee className="w-3 h-3 mr-0.5" />
+                                      {marginRequired.toFixed(2)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Effective Leverage:</span>
+                                    <span className="font-bold">{leverage.toFixed(2)}x</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Total Shares Exposure:</span>
+                                    <span className="font-bold">{contract.lotSize * futuresState.quantity}</span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
+                        
+                        {/* Risk Warning */}
+                        <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-md text-sm text-red-600 dark:text-red-400">
+                          <div className="flex items-start">
+                            <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <p className="font-medium mb-1">Futures Trading Risk Warning:</p>
+                              <p>
+                                Futures trading involves substantial risk and leverage. You are trading with borrowed money and small market movements can have a large impact on your position. Make sure you understand the risks before trading.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                    <CardFooter>
+                      <Button 
+                        className="w-full"
+                        onClick={executeFuturesTrade}
+                        disabled={isLoading || !selectedStock || !futuresState.selectedContractId}
+                      >
+                        {isLoading ? (
+                          <>
+                            <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                            Executing Trade...
+                          </>
+                        ) : (
+                          <>
+                            <ArrowUpDown className="mr-2 h-4 w-4" />
+                            Execute Futures Trade
+                          </>
+                        )}
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                </TabsContent>
+                
+                <TabsContent value="options">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <Layers className="w-5 h-5 mr-2" />
+                        Options Trading
+                      </CardTitle>
+                      <CardDescription>
+                        Trade options contracts with the right to buy or sell at a specific price
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {/* Option Type Selection */}
+                        <div className="space-y-2">
+                          <Label>Option Type</Label>
+                          <div className="flex space-x-2">
+                            <Button
+                              variant={optionsState.optionType === "CALL" ? "default" : "outline"}
+                              className={optionsState.optionType === "CALL" ? "w-1/2 bg-green-500 hover:bg-green-600" : "w-1/2"}
+                              onClick={() => setOptionsState(prev => ({ ...prev, optionType: "CALL" }))}
+                            >
+                              Call Options
+                            </Button>
+                            <Button
+                              variant={optionsState.optionType === "PUT" ? "default" : "outline"}
+                              className={optionsState.optionType === "PUT" ? "w-1/2 bg-red-500 hover:bg-red-600" : "w-1/2"}
+                              onClick={() => setOptionsState(prev => ({ ...prev, optionType: "PUT" }))}
+                            >
+                              Put Options
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        {/* Contract Selection */}
+                        <div className="space-y-2">
+                          <Label htmlFor="options-contract">Select Options Contract</Label>
+                          <Select 
+                            value={optionsState.selectedContractId} 
+                            onValueChange={(value) => {
+                              const contract = optionsContracts.find(c => c.id === value);
+                              if (contract) {
+                                setOptionsState(prev => ({ 
+                                  ...prev, 
+                                  selectedContractId: value,
+                                  strikePrice: contract.strikePrice,
+                                  expiryDate: contract.expiryDate
+                                }));
+                              }
+                            }}
+                          >
+                            <SelectTrigger id="options-contract">
+                              <SelectValue placeholder="Select an options contract" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {optionsContracts.map(contract => (
+                                <SelectItem key={contract.id} value={contract.id}>
+                                  {contract.stock.symbol} {contract.type} {contract.strikePrice} - {new Date(contract.expiryDate).toLocaleDateString()}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        {/* Selected Contract Details */}
+                        {optionsState.selectedContractId && optionsContracts.length > 0 && (
+                          <div className="p-3 bg-muted rounded-md">
+                            <h3 className="font-semibold mb-2">Contract Details</h3>
+                            {(() => {
+                              const contract = optionsContracts.find(c => c.id === optionsState.selectedContractId);
+                              if (!contract) return null;
+                              
+                              // Calculate intrinsic value
+                              let intrinsicValue = 0;
+                              if (contract.type === 'CALL') {
+                                intrinsicValue = Math.max(0, contract.stock.currentPrice - contract.strikePrice);
+                              } else {
+                                intrinsicValue = Math.max(0, contract.strikePrice - contract.stock.currentPrice);
+                              }
+                              
+                              // Calculate time value
+                              const timeValue = contract.premiumPrice - intrinsicValue;
+                              
+                              return (
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                  <div>
+                                    <p className="text-muted-foreground">Stock</p>
+                                    <p className="font-bold">{contract.stock.symbol}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Option Type</p>
+                                    <p className="font-bold">{contract.type}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Strike Price</p>
+                                    <p className="font-bold flex items-center">
+                                      <IndianRupee className="w-3 h-3 mr-0.5" />
+                                      {contract.strikePrice.toFixed(2)}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Premium</p>
+                                    <p className="font-bold flex items-center">
+                                      <IndianRupee className="w-3 h-3 mr-0.5" />
+                                      {contract.premiumPrice.toFixed(2)}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Expiry Date</p>
+                                    <p className="font-bold">{new Date(contract.expiryDate).toLocaleDateString()}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Lot Size</p>
+                                    <p className="font-bold">{contract.lotSize}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Intrinsic Value</p>
+                                    <p className="font-bold flex items-center">
+                                      <IndianRupee className="w-3 h-3 mr-0.5" />
+                                      {intrinsicValue.toFixed(2)}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Time Value</p>
+                                    <p className="font-bold flex items-center">
+                                      <IndianRupee className="w-3 h-3 mr-0.5" />
+                                      {timeValue.toFixed(2)}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
+                        
+                        {/* Order Type */}
+                        <div className="space-y-2">
+                          <Label>Order Type</Label>
+                          <div className="flex space-x-2">
+                            <Button
+                              variant={optionsState.type === "BUY" ? "default" : "outline"}
+                              className={optionsState.type === "BUY" ? "w-1/2 bg-green-500 hover:bg-green-600" : "w-1/2"}
+                              onClick={() => setOptionsState(prev => ({ ...prev, type: "BUY" }))}
+                            >
+                              Buy
+                            </Button>
+                            <Button
+                              variant={optionsState.type === "SELL" ? "default" : "outline"}
+                              className={optionsState.type === "SELL" ? "w-1/2 bg-red-500 hover:bg-red-600" : "w-1/2"}
+                              onClick={() => setOptionsState(prev => ({ ...prev, type: "SELL" }))}
+                            >
+                              Sell
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        {/* Quantity (in lots) */}
+                        <div className="space-y-2">
+                          <Label htmlFor="options-quantity">Quantity (Lots)</Label>
+                          <Input
+                            id="options-quantity"
+                            type="number"
+                            min="1"
+                            value={optionsState.quantity}
+                            onChange={(e) => setOptionsState(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
+                          />
+                        </div>
+                        
+                        {/* Trade Summary */}
+                        {optionsState.selectedContractId && optionsContracts.length > 0 && (
+                          <div className="p-3 bg-muted rounded-md">
+                            <h3 className="font-semibold mb-2">Trade Summary</h3>
+                            {(() => {
+                              const contract = optionsContracts.find(c => c.id === optionsState.selectedContractId);
+                              if (!contract) return null;
+                              
+                              const totalPremium = contract.premiumPrice * contract.lotSize * optionsState.quantity;
+                              const maxProfit = optionsState.type === "BUY" 
+                                ? (contract.type === "CALL" 
+                                  ? "Unlimited" 
+                                  : `₹${((contract.strikePrice - contract.stock.currentPrice) * contract.lotSize * optionsState.quantity).toFixed(2)}`)
+                                : `₹${totalPremium.toFixed(2)}`;
+                              
+                              const maxLoss = optionsState.type === "BUY" 
+                                ? `₹${totalPremium.toFixed(2)}` 
+                                : (contract.type === "CALL" 
+                                  ? "Unlimited" 
+                                  : `₹${((contract.strikePrice - contract.stock.currentPrice) * contract.lotSize * optionsState.quantity).toFixed(2)}`);
+                              
+                              return (
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex justify-between">
+                                    <span>Total Premium:</span>
+                                    <span className="font-bold flex items-center">
+                                      <IndianRupee className="w-3 h-3 mr-0.5" />
+                                      {totalPremium.toFixed(2)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Total Shares Exposure:</span>
+                                    <span className="font-bold">{contract.lotSize * optionsState.quantity}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Maximum Profit:</span>
+                                    <span className="font-bold text-green-500">{maxProfit}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Maximum Loss:</span>
+                                    <span className="font-bold text-red-500">{maxLoss}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Break-even Price:</span>
+                                    <span className="font-bold flex items-center">
+                                      <IndianRupee className="w-3 h-3 mr-0.5" />
+                                      {contract.type === "CALL" 
+                                        ? (contract.strikePrice + contract.premiumPrice).toFixed(2)
+                                        : (contract.strikePrice - contract.premiumPrice).toFixed(2)}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
+                        
+                        {/* Risk Warning */}
+                        <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-md text-sm text-red-600 dark:text-red-400">
+                          <div className="flex items-start">
+                            <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <p className="font-medium mb-1">Options Trading Risk Warning:</p>
+                              <p>
+                                Options trading involves significant risk and is not suitable for all investors. Options can be highly volatile and buyers can lose their entire investment. Options sellers may face unlimited risk. Understand the risks before trading.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                    <CardFooter>
+                      <Button 
+                        className="w-full"
+                        onClick={executeOptionsTrade}
+                        disabled={isLoading || !selectedStock || !optionsState.selectedContractId}
+                      >
+                        {isLoading ? (
+                          <>
+                            <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                            Executing Trade...
+                          </>
+                        ) : (
+                          <>
+                            <Layers className="mr-2 h-4 w-4" />
+                            Execute Options Trade
                           </>
                         )}
                       </Button>
