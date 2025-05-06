@@ -99,18 +99,30 @@ const isAdminOrAuthPage =
   window.location.pathname.includes('/forgot-password') ||
   window.location.pathname.includes('/auth/');
 
+// Check if we're specifically on an admin page
+const isAdminPage = 
+  window.location.pathname.includes('/admin') || 
+  window.location.pathname.includes('/admin-login');
+
 // Main initialization function
 async function initializeServiceWorker() {
   console.log('Initializing service worker management...');
   
   // For admin pages, completely disable service worker
-  if (window.location.pathname.includes('/admin') || 
-      window.location.pathname.includes('/admin-login')) {
+  if (isAdminPage) {
     console.log('On admin page - disabling service worker completely');
+    
+    // Unregister service workers first
+    await unregisterServiceWorkers();
+    
+    // Then clear caches and storage
     await clearAuthStorage();
     await sendClearCacheMessage();
     await clearAllCaches();
-    await unregisterServiceWorkers();
+    
+    // Add a flag to prevent service worker registration
+    sessionStorage.setItem('disableServiceWorker', 'true');
+    
     return; // Don't register service worker on admin pages
   }
   

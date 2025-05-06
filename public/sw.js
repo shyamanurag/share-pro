@@ -1,4 +1,15 @@
-const CACHE_NAME = 'tradepaper-india-v5';
+// Immediately exit if this is an admin page request
+self.addEventListener('install', (event) => {
+  // Check if the request is for an admin page
+  const url = self.location.href;
+  if (url.includes('/admin') || url.includes('/admin-login')) {
+    console.log('[Service Worker] Admin page detected, skipping installation');
+    self.skipWaiting();
+    return;
+  }
+});
+
+const CACHE_NAME = 'tradepaper-india-v6';
 const urlsToCache = [
   '/',
   '/dashboard',

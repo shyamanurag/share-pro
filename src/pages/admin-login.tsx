@@ -59,7 +59,7 @@ const AdminLoginPage = () => {
       }
       
       // Wait a moment to ensure signout is complete
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
       try {
         // Sign in with demo credentials
@@ -88,6 +88,10 @@ const AdminLoginPage = () => {
           
           // Wait to ensure auth state is updated
           await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          // Store a flag in sessionStorage to indicate admin login
+          sessionStorage.setItem('adminLoginAttempt', 'true');
+          sessionStorage.setItem('adminLoginTime', Date.now().toString());
           
           // Force a hard redirect to the admin page
           console.log('Redirecting to admin page');
@@ -126,6 +130,22 @@ const AdminLoginPage = () => {
         sessionStorage.clear();
       }
       
+      // Unregister service workers if they exist
+      if ('serviceWorker' in navigator) {
+        console.log('Unregistering service workers');
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const registration of registrations) {
+          await registration.unregister();
+        }
+      }
+      
+      // Clear caches
+      if ('caches' in window) {
+        console.log('Clearing browser caches');
+        const cacheKeys = await caches.keys();
+        await Promise.all(cacheKeys.map(key => caches.delete(key)));
+      }
+      
       // First sign out to ensure a clean state
       try {
         const supabase = createClient();
@@ -137,20 +157,54 @@ const AdminLoginPage = () => {
       }
       
       // Wait a moment to ensure signout is complete
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
       console.log(`Attempting to sign in with email: ${email}`);
       
-      // Sign in with provided credentials
-      await signIn(email, password);
-      console.log('Sign in successful');
+      // Create a fresh Supabase client
+      const freshSupabase = createClient();
       
-      // Wait a moment to ensure the auth state is updated
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Sign in directly with Supabase client to bypass any middleware
+      const { data, error } = await freshSupabase.auth.signInWithPassword({
+        email,
+        password
+      });
       
-      // Use direct location change for more reliable navigation
-      console.log('Redirecting to admin page');
-      window.location.href = '/admin';
+      if (error) {
+        throw error;
+      }
+      
+      if (data.user) {
+        console.log('Sign in successful, user data:', data.user);
+        
+        // For admin users, ensure they have the admin role
+        if (email.includes('admin') || email === 'demo@papertrader.app') {
+          console.log('Admin user detected, updating metadata');
+          // Always update user metadata to include admin role
+          try {
+            await freshSupabase.auth.updateUser({
+              data: { role: 'ADMIN' }
+            });
+            console.log('Admin role set in user metadata');
+          } catch (updateError) {
+            console.error('Error updating user metadata:', updateError);
+            // Continue anyway
+          }
+        }
+        
+        // Store a flag in sessionStorage to indicate admin login
+        sessionStorage.setItem('adminLoginAttempt', 'true');
+        sessionStorage.setItem('adminLoginTime', Date.now().toString());
+        
+        // Wait a moment to ensure the auth state is updated
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Use direct location change for more reliable navigation
+        console.log('Redirecting to admin page');
+        window.location.href = '/admin';
+      } else {
+        throw new Error('No user data returned from authentication');
+      }
     } catch (error) {
       console.error('Login error:', error);
       toast({

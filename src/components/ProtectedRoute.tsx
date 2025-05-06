@@ -32,13 +32,25 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
           return;
         }
         
+        // Check for recent admin login attempt
+        const adminLoginAttempt = sessionStorage.getItem('adminLoginAttempt');
+        const adminLoginTime = sessionStorage.getItem('adminLoginTime');
+        const isRecentAdminLogin = adminLoginAttempt === 'true' && 
+          adminLoginTime && 
+          (Date.now() - parseInt(adminLoginTime)) < 10000; // Within 10 seconds
+        
+        // If there was a recent admin login attempt, allow access temporarily
+        if (isRecentAdminLogin && router.pathname === '/admin') {
+          console.log('Recent admin login detected, allowing access temporarily');
+          return;
+        }
+        
         // If trying to access admin page but not logged in
         if (!user) {
           console.log('User not authenticated for admin route, redirecting to admin login');
           setIsNavigating(true);
-          router.push('/admin-login').finally(() => {
-            setTimeout(() => setIsNavigating(false), 500);
-          });
+          // Use window.location for a hard redirect
+          window.location.href = '/admin-login';
           return;
         }
         
@@ -46,9 +58,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
         if (user && !isAdmin && router.pathname !== '/admin-login') {
           console.log('User not admin, redirecting to dashboard');
           setIsNavigating(true);
-          router.push('/dashboard-india').finally(() => {
-            setTimeout(() => setIsNavigating(false), 500);
-          });
+          window.location.href = '/dashboard-india';
           return;
         }
         
@@ -56,9 +66,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
         if (user && isAdmin && router.pathname === '/admin-login') {
           console.log('Admin already authenticated, redirecting to admin page');
           setIsNavigating(true);
-          router.push('/admin').finally(() => {
-            setTimeout(() => setIsNavigating(false), 500);
-          });
+          window.location.href = '/admin';
           return;
         }
       }

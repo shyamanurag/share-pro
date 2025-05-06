@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/router";
 import Head from "next/head";
+import AdminLoading from "@/components/AdminLoading";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -663,6 +664,8 @@ export default function AdminDashboard() {
     }, 1500);
   };
 
+  const { initializing } = useAuth();
+  
   // Check if user is admin - simplified check that treats demo user as admin
   const isAdmin = user && (
     user.email === "admin@papertrader.app" || 
@@ -677,39 +680,36 @@ export default function AdminDashboard() {
     console.log('Admin check - App metadata:', user?.app_metadata);
     console.log('Admin check - Is admin:', isAdmin);
     
-    // If no user is found, redirect to admin login
-    if (!initializing && !user) {
-      console.log('No user found, redirecting to admin login');
-      router.replace('/admin-login');
+    // If auth is still initializing, wait
+    if (initializing) {
+      console.log('Auth still initializing, waiting...');
       return;
     }
     
-    // Add a longer delay to ensure auth state is fully loaded
-    const checkAdminStatus = setTimeout(() => {
-      // Force demo@papertrader.app to be treated as admin regardless of metadata
-      if (user && user.email === "demo@papertrader.app") {
-        console.log('Demo user detected, granting admin access');
-        return;
-      }
-      
-      if (user && !isAdmin) {
-        console.log('User is not admin, redirecting to dashboard');
-        router.replace('/dashboard-india');
-      } else {
-        console.log('Admin access granted');
-      }
-    }, 2000);
+    // If no user is found, redirect to admin login
+    if (!user) {
+      console.log('No user found, redirecting to admin login');
+      window.location.href = '/admin-login';
+      return;
+    }
     
-    return () => clearTimeout(checkAdminStatus);
-  }, [user, isAdmin, router]);
+    // Force demo@papertrader.app to be treated as admin regardless of metadata
+    if (user.email === "demo@papertrader.app") {
+      console.log('Demo user detected, granting admin access');
+      return;
+    }
+    
+    // If user is not admin, redirect to dashboard
+    if (!isAdmin) {
+      console.log('User is not admin, redirecting to dashboard');
+      window.location.href = '/dashboard-india';
+    } else {
+      console.log('Admin access granted');
+    }
+  }, [user, isAdmin, initializing]);
 
-  if (!user) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <h1 className="text-2xl font-bold mb-4">Loading...</h1>
-        <p className="text-muted-foreground mb-6">Please wait while we check your credentials.</p>
-      </div>
-    );
+  if (!user || initializing) {
+    return <AdminLoading />;
   }
 
   if (!isAdmin) {
