@@ -711,6 +711,51 @@ export default function AdminDashboard() {
                   }}
                 />
               </div>
+              <div className="text-center">
+                <Button 
+                  variant="link" 
+                  size="sm"
+                  className="text-xs text-muted-foreground"
+                  onClick={() => {
+                    setIsLoading(true);
+                    fetch('/api/demo/create-admin-user', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                    })
+                      .then(response => response.json())
+                      .then(data => {
+                        if (data.success) {
+                          toast({
+                            title: "Admin User Ready",
+                            description: "Admin user has been created or verified in the database.",
+                          });
+                          setAdminPassword('admin1234'); // Auto-fill the password
+                        } else {
+                          toast({
+                            variant: "destructive",
+                            title: "Error",
+                            description: data.error || "Failed to create admin user",
+                          });
+                        }
+                      })
+                      .catch(error => {
+                        console.error('Error creating admin user:', error);
+                        toast({
+                          variant: "destructive",
+                          title: "Error",
+                          description: "Failed to create admin user. See console for details.",
+                        });
+                      })
+                      .finally(() => {
+                        setIsLoading(false);
+                      });
+                  }}
+                >
+                  Setup Admin User
+                </Button>
+              </div>
             </div>
           </CardContent>
           <CardFooter>
