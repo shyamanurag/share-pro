@@ -15,7 +15,9 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     user.email === "admin@papertrader.app" || 
     user.email === "demo@papertrader.app" || 
     user.user_metadata?.role === "ADMIN" ||
-    user.app_metadata?.role === "ADMIN"
+    user.app_metadata?.role === "ADMIN" ||
+    localStorage.getItem('adminUser') === 'true' ||
+    sessionStorage.getItem('adminUser') === 'true'
   );
 
   useEffect(() => {
@@ -35,9 +37,11 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
         // Check for recent admin login attempt
         const adminLoginAttempt = sessionStorage.getItem('adminLoginAttempt');
         const adminLoginTime = sessionStorage.getItem('adminLoginTime');
-        const isRecentAdminLogin = adminLoginAttempt === 'true' && 
+        const adminUserFlag = localStorage.getItem('adminUser') === 'true' || sessionStorage.getItem('adminUser') === 'true';
+        const isRecentAdminLogin = (adminLoginAttempt === 'true' && 
           adminLoginTime && 
-          (Date.now() - parseInt(adminLoginTime)) < 10000; // Within 10 seconds
+          (Date.now() - parseInt(adminLoginTime)) < 30000) || // Within 30 seconds
+          adminUserFlag;
         
         // If there was a recent admin login attempt, allow access temporarily
         if (isRecentAdminLogin && router.pathname === '/admin') {

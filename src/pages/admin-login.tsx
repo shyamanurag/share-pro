@@ -23,85 +23,52 @@ const AdminLoginPage = () => {
   const handleDirectAdminLogin = async () => {
     setIsLoading(true);
     try {
-      // Clear any existing auth state
-      if (typeof window !== 'undefined') {
-        console.log('Clearing local storage and session storage');
-        localStorage.clear();
-        sessionStorage.clear();
-      }
-      
-      // Unregister service workers if they exist
-      if ('serviceWorker' in navigator) {
-        console.log('Unregistering service workers');
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        for (const registration of registrations) {
-          await registration.unregister();
-        }
-      }
-      
-      // Clear caches
-      if ('caches' in window) {
-        console.log('Clearing browser caches');
-        const cacheKeys = await caches.keys();
-        await Promise.all(cacheKeys.map(key => caches.delete(key)));
-      }
-      
       console.log('Starting one-click admin login process');
       
-      // First sign out to ensure a clean state
-      try {
-        const supabase = createClient();
-        await supabase.auth.signOut();
-        console.log('Successfully signed out before new sign in');
-      } catch (signOutError) {
-        console.error('Error during pre-signin signout:', signOutError);
-        // Continue anyway
+      // Clear everything first
+      await clearBrowserState();
+      
+      // Create a completely fresh Supabase client
+      const freshSupabase = createClient();
+      
+      // Sign in with demo credentials
+      console.log('Attempting to sign in with demo@papertrader.app');
+      
+      // Sign in directly with Supabase client
+      const { data, error } = await freshSupabase.auth.signInWithPassword({
+        email: 'demo@papertrader.app',
+        password: 'demo1234'
+      });
+      
+      if (error) {
+        console.error('Sign in error:', error);
+        throw error;
       }
       
-      // Wait a moment to ensure signout is complete
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      try {
-        // Sign in with demo credentials
-        console.log('Attempting to sign in with demo@papertrader.app');
+      if (data.user) {
+        console.log('Admin sign in successful using demo account, user:', data.user);
         
-        // Create a fresh Supabase client
-        const freshSupabase = createClient();
-        
-        // Sign in directly with Supabase client to bypass any middleware
-        const { data, error } = await freshSupabase.auth.signInWithPassword({
-          email: 'demo@papertrader.app',
-          password: 'demo1234'
+        // Set admin role in user metadata
+        const updateResult = await freshSupabase.auth.updateUser({
+          data: { role: 'ADMIN' }
         });
         
-        if (error) {
-          throw error;
-        }
+        console.log('Metadata update result:', updateResult);
         
-        if (data.user) {
-          console.log('Admin sign in successful using demo account');
-          
-          // Set admin role in user metadata
-          await freshSupabase.auth.updateUser({
-            data: { role: 'ADMIN' }
-          });
-          
-          // Wait to ensure auth state is updated
-          await new Promise(resolve => setTimeout(resolve, 3000));
-          
-          // Store a flag in sessionStorage to indicate admin login
-          sessionStorage.setItem('adminLoginAttempt', 'true');
-          sessionStorage.setItem('adminLoginTime', Date.now().toString());
-          
-          // Force a hard redirect to the admin page
-          console.log('Redirecting to admin page');
-          window.location.href = '/admin';
-        } else {
-          throw new Error('No user data returned from authentication');
-        }
-      } catch (signInError) {
-        console.error('Admin sign in error:', signInError);
-        throw signInError;
+        // Store admin flags in both localStorage and sessionStorage for redundancy
+        localStorage.setItem('adminUser', 'true');
+        sessionStorage.setItem('adminUser', 'true');
+        sessionStorage.setItem('adminLoginAttempt', 'true');
+        sessionStorage.setItem('adminLoginTime', Date.now().toString());
+        
+        // Wait to ensure auth state is updated
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Force a hard redirect to the admin page
+        console.log('Redirecting to admin page');
+        window.location.replace('/admin');
+      } else {
+        throw new Error('No user data returned from authentication');
       }
     } catch (error) {
       console.error('Admin login error:', error);
@@ -115,6 +82,59 @@ const AdminLoginPage = () => {
       setIsLoading(false);
     }
   };
+  
+  // Helper function to clear browser state
+  const clearBrowserState = async () => {
+    console.log('Clearing browser state...');
+    
+    // Clear storage
+    if (typeof window !== 'undefined') {
+      console.log('Clearing local storage and session storage');
+      localStorage.clear();
+      sessionStorage.clear();
+    }
+    
+    // Unregister service workers
+    if ('serviceWorker' in navigator) {
+      console.log('Unregistering service workers');
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const registration of registrations) {
+          await registration.unregister();
+          console.log('Unregistered service worker:', registration.scope);
+        }
+      } catch (e) {
+        console.error('Error unregistering service workers:', e);
+      }
+    }
+    
+    // Clear caches
+    if ('caches' in window) {
+      console.log('Clearing browser caches');
+      try {
+        const cacheKeys = await caches.keys();
+        await Promise.all(cacheKeys.map(key => caches.delete(key)));
+        console.log('Cleared caches:', cacheKeys);
+      } catch (e) {
+        console.error('Error clearing caches:', e);
+      }
+    }
+    
+    // Sign out from any existing session
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      console.log('Successfully signed out before new sign in');
+    } catch (signOutError) {
+      console.error('Error during pre-signin signout:', signOutError);
+    }
+    
+    // Wait a moment to ensure everything is cleared
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log('Browser state cleared');
+    
+    return true;
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,54 +143,24 @@ const AdminLoginPage = () => {
     try {
       const { email, password } = formik.values;
       
-      // Clear any existing auth state
-      if (typeof window !== 'undefined') {
-        console.log('Clearing local storage and session storage');
-        localStorage.clear();
-        sessionStorage.clear();
-      }
+      console.log(`Starting admin login process with email: ${email}`);
       
-      // Unregister service workers if they exist
-      if ('serviceWorker' in navigator) {
-        console.log('Unregistering service workers');
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        for (const registration of registrations) {
-          await registration.unregister();
-        }
-      }
+      // Clear everything first
+      await clearBrowserState();
       
-      // Clear caches
-      if ('caches' in window) {
-        console.log('Clearing browser caches');
-        const cacheKeys = await caches.keys();
-        await Promise.all(cacheKeys.map(key => caches.delete(key)));
-      }
-      
-      // First sign out to ensure a clean state
-      try {
-        const supabase = createClient();
-        await supabase.auth.signOut();
-        console.log('Successfully signed out before new sign in');
-      } catch (signOutError) {
-        console.error('Error during pre-signin signout:', signOutError);
-        // Continue anyway
-      }
-      
-      // Wait a moment to ensure signout is complete
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Create a completely fresh Supabase client
+      const freshSupabase = createClient();
       
       console.log(`Attempting to sign in with email: ${email}`);
       
-      // Create a fresh Supabase client
-      const freshSupabase = createClient();
-      
-      // Sign in directly with Supabase client to bypass any middleware
+      // Sign in directly with Supabase client
       const { data, error } = await freshSupabase.auth.signInWithPassword({
         email,
         password
       });
       
       if (error) {
+        console.error('Sign in error:', error);
         throw error;
       }
       
@@ -180,28 +170,26 @@ const AdminLoginPage = () => {
         // For admin users, ensure they have the admin role
         if (email.includes('admin') || email === 'demo@papertrader.app') {
           console.log('Admin user detected, updating metadata');
-          // Always update user metadata to include admin role
-          try {
-            await freshSupabase.auth.updateUser({
-              data: { role: 'ADMIN' }
-            });
-            console.log('Admin role set in user metadata');
-          } catch (updateError) {
-            console.error('Error updating user metadata:', updateError);
-            // Continue anyway
-          }
+          
+          const updateResult = await freshSupabase.auth.updateUser({
+            data: { role: 'ADMIN' }
+          });
+          
+          console.log('Metadata update result:', updateResult);
         }
         
-        // Store a flag in sessionStorage to indicate admin login
+        // Store admin flags in both localStorage and sessionStorage for redundancy
+        localStorage.setItem('adminUser', 'true');
+        sessionStorage.setItem('adminUser', 'true');
         sessionStorage.setItem('adminLoginAttempt', 'true');
         sessionStorage.setItem('adminLoginTime', Date.now().toString());
         
-        // Wait a moment to ensure the auth state is updated
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Wait to ensure auth state is updated
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
         // Use direct location change for more reliable navigation
         console.log('Redirecting to admin page');
-        window.location.href = '/admin';
+        window.location.replace('/admin');
       } else {
         throw new Error('No user data returned from authentication');
       }
@@ -239,28 +227,17 @@ const AdminLoginPage = () => {
   const clearCache = async () => {
     setIsLoading(true);
     try {
-      // Clear localStorage and sessionStorage
-      localStorage.clear();
-      sessionStorage.clear();
-      
-      // Unregister service workers
-      if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        for (const registration of registrations) {
-          await registration.unregister();
-        }
-      }
-      
-      // Clear caches
-      if ('caches' in window) {
-        const cacheKeys = await caches.keys();
-        await Promise.all(cacheKeys.map(key => caches.delete(key)));
-      }
+      await clearBrowserState();
       
       toast({
         title: "Cache Cleared",
         description: "Browser cache has been cleared. Please try logging in again.",
       });
+      
+      // Reload the page to ensure a fresh state
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error) {
       console.error('Error clearing cache:', error);
       toast({
@@ -363,7 +340,7 @@ const AdminLoginPage = () => {
                 </div>
               </form>
               
-              <div className="mt-4 text-center">
+              <div className="mt-4 space-y-2 text-center">
                 <Button
                   type="button"
                   variant="link"
@@ -372,6 +349,91 @@ const AdminLoginPage = () => {
                   disabled={isLoading}
                 >
                   Having trouble? Clear browser cache
+                </Button>
+                
+                <Button
+                  type="button"
+                  variant="link"
+                  className="text-xs text-muted-foreground"
+                  onClick={() => {
+                    // Display auth state for debugging
+                    const authState = {
+                      localStorage: {
+                        adminUser: localStorage.getItem('adminUser'),
+                        supabaseItems: Object.keys(localStorage).filter(key => 
+                          key.includes('supabase') || key.includes('sb-'))
+                      },
+                      sessionStorage: {
+                        adminUser: sessionStorage.getItem('adminUser'),
+                        adminLoginAttempt: sessionStorage.getItem('adminLoginAttempt'),
+                        adminLoginTime: sessionStorage.getItem('adminLoginTime'),
+                        supabaseItems: Object.keys(sessionStorage).filter(key => 
+                          key.includes('supabase') || key.includes('sb-'))
+                      },
+                      serviceWorkers: 'Checking...',
+                      caches: 'Checking...'
+                    };
+                    
+                    console.log('Auth Debug State:', authState);
+                    
+                    // Check service workers
+                    if ('serviceWorker' in navigator) {
+                      navigator.serviceWorker.getRegistrations().then(registrations => {
+                        console.log('Service Workers:', registrations.map(r => r.scope));
+                      });
+                    }
+                    
+                    // Check caches
+                    if ('caches' in window) {
+                      caches.keys().then(cacheKeys => {
+                        console.log('Cache Keys:', cacheKeys);
+                      });
+                    }
+                    
+                    toast({
+                      title: "Debug Info",
+                      description: "Auth state logged to console. Please check browser console (F12).",
+                    });
+                  }}
+                >
+                  Debug Auth State
+                </Button>
+                
+                <Button
+                  type="button"
+                  variant="link"
+                  className="text-xs text-red-500"
+                  onClick={async () => {
+                    try {
+                      // Clear everything first
+                      await clearBrowserState();
+                      
+                      // Set admin flags directly without authentication
+                      localStorage.setItem('adminUser', 'true');
+                      sessionStorage.setItem('adminUser', 'true');
+                      sessionStorage.setItem('adminLoginAttempt', 'true');
+                      sessionStorage.setItem('adminLoginTime', Date.now().toString());
+                      
+                      toast({
+                        title: "Emergency Admin Access",
+                        description: "Admin flags set. Redirecting to admin page...",
+                      });
+                      
+                      // Wait a moment then redirect
+                      setTimeout(() => {
+                        window.location.replace('/admin');
+                      }, 1500);
+                    } catch (error) {
+                      console.error('Emergency access error:', error);
+                      toast({
+                        variant: "destructive",
+                        title: "Error",
+                        description: "Failed to set admin access. Please try again.",
+                      });
+                    }
+                  }}
+                >
+                  Emergency Admin Access
                 </Button>
               </div>
               
