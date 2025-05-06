@@ -329,7 +329,7 @@ export default function Dashboard() {
       
       toast({
         title: `${tradeType === 'BUY' ? 'Purchase' : 'Sale'} Successful`,
-        description: `${tradeType === 'BUY' ? 'Bought' : 'Sold'} ${tradeQuantity} shares of ${selectedStock.symbol} at $${selectedStock.currentPrice.toFixed(2)}`,
+        description: `${tradeType === 'BUY' ? 'Bought' : 'Sold'} ${tradeQuantity} shares of ${selectedStock.symbol} at ₹${selectedStock.currentPrice.toFixed(2)}`,
       });
     } catch (error: any) {
       console.error('Error executing trade:', error);
@@ -423,17 +423,26 @@ export default function Dashboard() {
                   <div className="flex justify-between items-center">
                     <div>
                       <p className="text-sm text-muted-foreground">Available Balance</p>
-                      <h2 className="text-2xl font-bold">${userProfile?.balance?.toFixed(2) || "0.00"}</h2>
+                      <h2 className="text-2xl font-bold flex items-center">
+                        <IndianRupee className="w-5 h-5 mr-1" />
+                        {userProfile?.balance?.toFixed(2) || "0.00"}
+                      </h2>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Portfolio Value</p>
-                      <h2 className="text-2xl font-bold">${portfolioValue.toFixed(2)}</h2>
+                      <h2 className="text-2xl font-bold flex items-center justify-end">
+                        <IndianRupee className="w-5 h-5 mr-1" />
+                        {portfolioValue.toFixed(2)}
+                      </h2>
                     </div>
                   </div>
                   <div className="mt-4 pt-4 border-t border-border">
                     <div className="flex justify-between items-center">
                       <p className="text-sm font-medium">Total Value</p>
-                      <p className="text-lg font-bold">${((userProfile?.balance || 0) + portfolioValue).toFixed(2)}</p>
+                      <p className="text-lg font-bold flex items-center">
+                        <IndianRupee className="w-4 h-4 mr-1" />
+                        {((userProfile?.balance || 0) + portfolioValue).toFixed(2)}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -525,7 +534,10 @@ export default function Dashboard() {
                                   <p className="text-sm text-muted-foreground">{stock.name}</p>
                                 </div>
                                 <div className="text-right">
-                                  <p className="font-bold">₹{stock.currentPrice.toFixed(2)}</p>
+                                  <p className="font-bold flex items-center justify-end">
+                                    <IndianRupee className="w-3.5 h-3.5 mr-0.5" />
+                                    {stock.currentPrice.toFixed(2)}
+                                  </p>
                                   <div className={`flex items-center justify-end text-sm ${stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                                     {stock.change >= 0 ? (
                                       <TrendingUp className="w-3 h-3 mr-1" />
@@ -540,7 +552,7 @@ export default function Dashboard() {
                               <div className="mt-3 pt-3 border-t border-border">
                                 <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                                   <div>Volume: {stock.volume.toLocaleString()}</div>
-                                  <div>Market Cap: ${(stock.marketCap ? (stock.marketCap / 1000000000).toFixed(2) : "N/A")}B</div>
+                                  <div>Market Cap: ₹{(stock.marketCap ? (stock.marketCap / 10000000).toFixed(2) : "N/A")} Cr</div>
                                 </div>
                                 <div className="mt-3 flex justify-between">
                                   <Button 
@@ -639,7 +651,10 @@ export default function Dashboard() {
                                     <p className="text-sm text-muted-foreground">{item.stock.name}</p>
                                   </div>
                                   <div className="text-right">
-                                    <p className="font-bold">${item.stock.currentPrice.toFixed(2)}</p>
+                                    <p className="font-bold flex items-center justify-end">
+                                    <IndianRupee className="w-3.5 h-3.5 mr-0.5" />
+                                    {item.stock.currentPrice.toFixed(2)}
+                                  </p>
                                     <div className={`flex items-center justify-end text-sm ${item.stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                                       {item.stock.change >= 0 ? (
                                         <TrendingUp className="w-3 h-3 mr-1" />
@@ -654,7 +669,7 @@ export default function Dashboard() {
                                 <div className="mt-3 pt-3 border-t border-border">
                                   <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                                     <div>Volume: {item.stock.volume.toLocaleString()}</div>
-                                    <div>Market Cap: ${(item.stock.marketCap ? (item.stock.marketCap / 1000000000).toFixed(2) : "N/A")}B</div>
+                                    <div>Market Cap: ₹{(item.stock.marketCap ? (item.stock.marketCap / 10000000).toFixed(2) : "N/A")} Cr</div>
                                   </div>
                                   <div className="mt-3 flex justify-between">
                                     <Button 
@@ -722,17 +737,26 @@ export default function Dashboard() {
                   <div className="flex justify-between items-center">
                     <div>
                       <p className="text-sm text-muted-foreground">Available Balance</p>
-                      <h2 className="text-2xl font-bold">${userProfile?.balance?.toFixed(2) || "0.00"}</h2>
+                      <h2 className="text-2xl font-bold flex items-center">
+                        <IndianRupee className="w-5 h-5 mr-1" />
+                        {userProfile?.balance?.toFixed(2) || "0.00"}
+                      </h2>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Portfolio Value</p>
-                      <h2 className="text-2xl font-bold">${portfolioValue.toFixed(2)}</h2>
+                      <h2 className="text-2xl font-bold flex items-center justify-end">
+                        <IndianRupee className="w-5 h-5 mr-1" />
+                        {portfolioValue.toFixed(2)}
+                      </h2>
                     </div>
                   </div>
                   <div className="mt-4 pt-4 border-t border-border">
                     <div className="flex justify-between items-center">
                       <p className="text-sm font-medium">Total Value</p>
-                      <p className="text-lg font-bold">${((userProfile?.balance || 0) +  portfolioValue).toFixed(2)}</p>
+                      <p className="text-lg font-bold flex items-center">
+                        <IndianRupee className="w-4 h-4 mr-1" />
+                        {((userProfile?.balance || 0) +  portfolioValue).toFixed(2)}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -788,7 +812,10 @@ export default function Dashboard() {
                                   <p className="text-sm text-muted-foreground">{item.stock.name}</p>
                                 </div>
                                 <div className="text-right">
-                                  <p className="font-bold">${currentValue.toFixed(2)}</p>
+                                  <p className="font-bold flex items-center justify-end">
+                                    <IndianRupee className="w-3.5 h-3.5 mr-0.5" />
+                                    {currentValue.toFixed(2)}
+                                  </p>
                                   <div className={`flex items-center justify-end text-sm ${profit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                                     {profit >= 0 ? (
                                       <TrendingUp className="w-3 h-3 mr-1" />
@@ -802,8 +829,8 @@ export default function Dashboard() {
                               
                               <div className="mt-3 pt-3 border-t border-border">
                                 <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                                  <div>Avg. Buy: ${item.avgBuyPrice.toFixed(2)}</div>
-                                  <div>Current: ${item.stock.currentPrice.toFixed(2)}</div>
+                                  <div>Avg. Buy: ₹{item.avgBuyPrice.toFixed(2)}</div>
+                                  <div>Current: ₹{item.stock.currentPrice.toFixed(2)}</div>
                                 </div>
                                 <div className="mt-3 flex justify-between">
                                   <Button 
@@ -879,7 +906,10 @@ export default function Dashboard() {
                               <p className="text-sm text-muted-foreground">{transaction.stock.name}</p>
                             </div>
                             <div className="text-right">
-                              <p className="font-bold">${transaction.total.toFixed(2)}</p>
+                              <p className="font-bold flex items-center justify-end">
+                                <IndianRupee className="w-3.5 h-3.5 mr-0.5" />
+                                {transaction.total.toFixed(2)}
+                              </p>
                               <p className="text-xs text-muted-foreground">
                                 {new Date(transaction.timestamp).toLocaleString()}
                               </p>
@@ -888,8 +918,8 @@ export default function Dashboard() {
                           
                           <div className="mt-3 pt-3 border-t border-border">
                             <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                              <div>Price: ${transaction.price.toFixed(2)}</div>
-                              <div>Total: ${transaction.total.toFixed(2)}</div>
+                              <div>Price: ₹{transaction.price.toFixed(2)}</div>
+                              <div>Total: ₹{transaction.total.toFixed(2)}</div>
                             </div>
                           </div>
                         </CardContent>
@@ -942,13 +972,19 @@ export default function Dashboard() {
                     <Card>
                       <CardContent className="p-4 text-center">
                         <p className="text-sm text-muted-foreground">Balance</p>
-                        <p className="text-xl font-bold">${userProfile?.balance?.toFixed(2) || "0.00"}</p>
+                        <p className="text-xl font-bold flex items-center justify-center">
+                          <IndianRupee className="w-4 h-4 mr-1" />
+                          {userProfile?.balance?.toFixed(2) || "0.00"}
+                        </p>
                       </CardContent>
                     </Card>
                     <Card>
                       <CardContent className="p-4 text-center">
                         <p className="text-sm text-muted-foreground">Portfolio Value</p>
-                        <p className="text-xl font-bold">${portfolioValue.toFixed(2)}</p>
+                        <p className="text-xl font-bold flex items-center justify-center">
+                          <IndianRupee className="w-4 h-4 mr-1" />
+                          {portfolioValue.toFixed(2)}
+                        </p>
                       </CardContent>
                     </Card>
                   </div>
@@ -956,7 +992,10 @@ export default function Dashboard() {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <p className="text-sm font-medium">Total Value</p>
-                      <p className="text-lg font-bold">${((userProfile?.balance || 0) + portfolioValue).toFixed(2)}</p>
+                      <p className="text-lg font-bold flex items-center">
+                        <IndianRupee className="w-4 h-4 mr-1" />
+                        {((userProfile?.balance || 0) + portfolioValue).toFixed(2)}
+                      </p>
                     </div>
                     <div className="flex justify-between items-center">
                       <p className="text-sm font-medium">Transactions</p>
@@ -1027,14 +1066,17 @@ export default function Dashboard() {
                 {tradeType === 'BUY' ? 'Buy' : 'Sell'} {selectedStock?.symbol}
               </DialogTitle>
               <DialogDescription>
-                {selectedStock?.name} - ${selectedStock?.currentPrice.toFixed(2)}
+                {selectedStock?.name} - ₹{selectedStock?.currentPrice.toFixed(2)}
               </DialogDescription>
             </DialogHeader>
             
             <div className="space-y-4 py-4">
               <div className="flex justify-between items-center">
                 <p className="text-sm font-medium">Available Balance:</p>
-                <p className="text-sm font-bold">${userProfile?.balance?.toFixed(2) || "0.00"}</p>
+                <p className="text-sm font-bold flex items-center">
+                  <IndianRupee className="w-3.5 h-3.5 mr-0.5" />
+                  {userProfile?.balance?.toFixed(2) || "0.00"}
+                </p>
               </div>
               
               {tradeType === 'SELL' && (
@@ -1076,7 +1118,10 @@ export default function Dashboard() {
               
               <div className="flex justify-between items-center pt-4 border-t">
                 <p className="text-sm font-medium">Total Value:</p>
-                <p className="text-lg font-bold">${calculateTradeValue().toFixed(2)}</p>
+                <p className="text-lg font-bold flex items-center">
+                  <IndianRupee className="w-4 h-4 mr-0.5" />
+                  {calculateTradeValue().toFixed(2)}
+                </p>
               </div>
               
               {tradeType === 'BUY' && calculateTradeValue() > (userProfile?.balance || 0) && (
