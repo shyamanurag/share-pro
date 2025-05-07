@@ -2157,15 +2157,601 @@ export default function Dashboard() {
                 
                 {/* Other tabs content remains the same */}
                 <TabsContent value="add-money">
-                  {/* Add Money content */}
+                  <Card className="mb-6">
+                    <CardHeader>
+                      <CardTitle className="text-lg">Add Money to Your Account</CardTitle>
+                      <CardDescription>Add funds to your paper trading account</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <form onSubmit={async (e) => {
+                        e.preventDefault();
+                        const formData = new FormData(e.currentTarget);
+                        const amount = formData.get('amount') as string;
+                        const paymentMethod = formData.get('paymentMethod') as string;
+                        
+                        if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+                          toast({
+                            variant: "destructive",
+                            title: "Invalid amount",
+                            description: "Please enter a valid amount greater than 0",
+                          });
+                          return;
+                        }
+                        
+                        try {
+                          setIsLoading(true);
+                          const response = await fetch('/api/user/add-money', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                              amount: parseFloat(amount),
+                              paymentMethod,
+                            }),
+                          });
+                          
+                          if (!response.ok) {
+                            const error = await response.json();
+                            throw new Error(error.error || 'Failed to add money');
+                          }
+                          
+                          const data = await response.json();
+                          
+                          // Update user profile with new balance
+                          setUserProfile(data.user);
+                          
+                          toast({
+                            title: "Money added successfully",
+                            description: data.message,
+                          });
+                          
+                          // Reset form
+                          e.currentTarget.reset();
+                        } catch (error: any) {
+                          toast({
+                            variant: "destructive",
+                            title: "Error",
+                            description: error.message || "Failed to add money",
+                          });
+                        } finally {
+                          setIsLoading(false);
+                        }
+                      }}>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <label htmlFor="amount" className="text-sm font-medium">Amount (₹)</label>
+                            <Input
+                              id="amount"
+                              name="amount"
+                              type="number"
+                              min="100"
+                              step="100"
+                              placeholder="Enter amount"
+                              required
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <label htmlFor="paymentMethod" className="text-sm font-medium">Payment Method</label>
+                            <select
+                              id="paymentMethod"
+                              name="paymentMethod"
+                              className="w-full p-2 border rounded-md"
+                              required
+                            >
+                              <option value="UPI">UPI</option>
+                              <option value="CARD">Credit/Debit Card</option>
+                            </select>
+                          </div>
+                          
+                          <Button 
+                            type="submit" 
+                            className="w-full bg-green-500 hover:bg-green-600"
+                            disabled={isLoading}
+                          >
+                            {isLoading ? (
+                              <span className="flex items-center">
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Processing...
+                              </span>
+                            ) : (
+                              <span className="flex items-center">
+                                <IndianRupee className="w-4 h-4 mr-2" />
+                                Add Money
+                              </span>
+                            )}
+                          </Button>
+                        </div>
+                      </form>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Recent Transactions</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {transactions.filter(t => t.type === 'ADD_MONEY').length > 0 ? (
+                          transactions.filter(t => t.type === 'ADD_MONEY').slice(0, 5).map((transaction, index) => (
+                            <div key={index} className="flex justify-between items-center p-3 bg-muted/30 rounded-md">
+                              <div>
+                                <p className="font-medium">Added ₹{transaction.total.toFixed(2)}</p>
+                                <p className="text-xs text-muted-foreground">{new Date(transaction.timestamp).toLocaleString()}</p>
+                              </div>
+                              <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                Completed
+                              </Badge>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-6 text-muted-foreground">
+                            <p>No deposit transactions yet</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
                 </TabsContent>
                 
                 <TabsContent value="risk-profile">
-                  {/* Risk Profile content */}
+                  <Card className="mb-6">
+                    <CardHeader>
+                      <CardTitle className="text-lg">Risk Management Profile</CardTitle>
+                      <CardDescription>Configure your trading risk parameters</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <form 
+                        id="riskProfileForm"
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          const formData = new FormData(e.currentTarget);
+                          
+                          const riskProfile = {
+                            maxPositionSize: parseFloat(formData.get('maxPositionSize') as string),
+                            maxDrawdown: parseFloat(formData.get('maxDrawdown') as string),
+                            riskPerTrade: parseFloat(formData.get('riskPerTrade') as string),
+                            stopLossDefault: parseFloat(formData.get('stopLossDefault') as string),
+                            takeProfitDefault: parseFloat(formData.get('takeProfitDefault') as string),
+                          };
+                          
+                          try {
+                            setIsLoading(true);
+                            const response = await fetch('/api/risk-profile', {
+                              method: 'PUT',
+                              headers: {
+                                'Content-Type': 'application/json',
+                              },
+                              body: JSON.stringify(riskProfile),
+                            });
+                            
+                            if (!response.ok) {
+                              const error = await response.json();
+                              throw new Error(error.error || 'Failed to update risk profile');
+                            }
+                            
+                            const data = await response.json();
+                            
+                            toast({
+                              title: "Risk profile updated",
+                              description: data.message,
+                            });
+                          } catch (error: any) {
+                            toast({
+                              variant: "destructive",
+                              title: "Error",
+                              description: error.message || "Failed to update risk profile",
+                            });
+                          } finally {
+                            setIsLoading(false);
+                          }
+                        }}
+                      >
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <label htmlFor="maxPositionSize" className="text-sm font-medium">Max Position Size (%)</label>
+                              <span className="text-xs text-muted-foreground">% of portfolio per position</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="maxPositionSize"
+                                name="maxPositionSize"
+                                type="number"
+                                min="1"
+                                max="100"
+                                defaultValue="5"
+                                required
+                                className="w-full"
+                              />
+                              <span className="text-sm">%</span>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <label htmlFor="maxDrawdown" className="text-sm font-medium">Max Drawdown (%)</label>
+                              <span className="text-xs text-muted-foreground">Maximum allowed portfolio loss</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="maxDrawdown"
+                                name="maxDrawdown"
+                                type="number"
+                                min="1"
+                                max="100"
+                                defaultValue="20"
+                                required
+                                className="w-full"
+                              />
+                              <span className="text-sm">%</span>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <label htmlFor="riskPerTrade" className="text-sm font-medium">Risk Per Trade (%)</label>
+                              <span className="text-xs text-muted-foreground">% of portfolio to risk per trade</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="riskPerTrade"
+                                name="riskPerTrade"
+                                type="number"
+                                min="0.1"
+                                max="10"
+                                step="0.1"
+                                defaultValue="1"
+                                required
+                                className="w-full"
+                              />
+                              <span className="text-sm">%</span>
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label htmlFor="stopLossDefault" className="text-sm font-medium">Default Stop Loss (%)</label>
+                              <div className="flex items-center space-x-2">
+                                <Input
+                                  id="stopLossDefault"
+                                  name="stopLossDefault"
+                                  type="number"
+                                  min="0.5"
+                                  max="20"
+                                  step="0.5"
+                                  defaultValue="5"
+                                  required
+                                  className="w-full"
+                                />
+                                <span className="text-sm">%</span>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <label htmlFor="takeProfitDefault" className="text-sm font-medium">Default Take Profit (%)</label>
+                              <div className="flex items-center space-x-2">
+                                <Input
+                                  id="takeProfitDefault"
+                                  name="takeProfitDefault"
+                                  type="number"
+                                  min="1"
+                                  max="50"
+                                  step="0.5"
+                                  defaultValue="10"
+                                  required
+                                  className="w-full"
+                                />
+                                <span className="text-sm">%</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <Button 
+                            type="submit" 
+                            className="w-full"
+                            disabled={isLoading}
+                          >
+                            {isLoading ? 'Updating...' : 'Save Risk Profile'}
+                          </Button>
+                        </div>
+                      </form>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Risk Analysis</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="p-4 bg-muted/30 rounded-md">
+                          <h4 className="font-medium mb-2">Current Portfolio Risk</h4>
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span>Largest Position</span>
+                              <span className="font-medium">
+                                {portfolioItems.length > 0 ? (
+                                  `${(portfolioItems.reduce((max, item) => {
+                                    const value = item.quantity * item.stock.currentPrice;
+                                    return value > max.value ? { stock: item.stock.symbol, value } : max;
+                                  }, { stock: '', value: 0 }).stock)} (${(portfolioItems.reduce((max, item) => {
+                                    const value = item.quantity * item.stock.currentPrice;
+                                    return value > max ? value : max;
+                                  }, 0) / portfolioValue * 100).toFixed(1)}%)`
+                                ) : 'None'}
+                              </span>
+                            </div>
+                            
+                            <div className="flex justify-between text-sm">
+                              <span>Sector Concentration</span>
+                              <span className="font-medium">
+                                {portfolioItems.length > 0 ? (
+                                  `${Object.entries(
+                                    portfolioItems.reduce((sectors, item) => {
+                                      const sector = item.stock.sector || 'Other';
+                                      const value = item.quantity * item.stock.currentPrice;
+                                      sectors[sector] = (sectors[sector] || 0) + value;
+                                      return sectors;
+                                    }, {} as Record<string, number>)
+                                  ).sort((a, b) => b[1] - a[1])[0]?.[0] || 'None'} (${(Object.entries(
+                                    portfolioItems.reduce((sectors, item) => {
+                                      const sector = item.stock.sector || 'Other';
+                                      const value = item.quantity * item.stock.currentPrice;
+                                      sectors[sector] = (sectors[sector] || 0) + value;
+                                      return sectors;
+                                    }, {} as Record<string, number>)
+                                  ).sort((a, b) => b[1] - a[1])[0]?.[1] / portfolioValue * 100).toFixed(1)}%)`
+                                ) : 'None'}
+                              </span>
+                            </div>
+                            
+                            <div className="flex justify-between text-sm">
+                              <span>Current Drawdown</span>
+                              <span className={`font-medium ${
+                                portfolioItems.reduce((total, item) => {
+                                  const profit = (item.stock.currentPrice - item.avgBuyPrice) * item.quantity;
+                                  const costBasis = item.avgBuyPrice * item.quantity;
+                                  return total + (profit / (costBasis || 1)) * 100;
+                                }, 0) < 0 ? 'text-red-500' : 'text-green-500'
+                              }`}>
+                                {portfolioItems.length > 0 ? (
+                                  `${portfolioItems.reduce((total, item) => {
+                                    const profit = (item.stock.currentPrice - item.avgBuyPrice) * item.quantity;
+                                    const costBasis = item.avgBuyPrice * item.quantity;
+                                    return total + (profit / (costBasis || 1)) * 100;
+                                  }, 0) < 0 ? portfolioItems.reduce((total, item) => {
+                                    const profit = (item.stock.currentPrice - item.avgBuyPrice) * item.quantity;
+                                    const costBasis = item.avgBuyPrice * item.quantity;
+                                    return total + (profit / (costBasis || 1)) * 100;
+                                  }, 0).toFixed(2) : '0.00'}%`
+                                ) : '0.00%'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="p-4 bg-muted/30 rounded-md">
+                          <h4 className="font-medium mb-2">Risk Recommendations</h4>
+                          <ul className="space-y-2 text-sm">
+                            <li className="flex items-start gap-2">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500 mt-0.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                              <span>Diversify your portfolio across multiple sectors to reduce risk</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500 mt-0.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                              <span>Consider setting stop-loss orders for all positions to limit potential losses</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500 mt-0.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                              <span>Maintain a balanced ratio between equity and F&O positions</span>
+                            </li>
+                          </ul>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </TabsContent>
                 
                 <TabsContent value="kyc">
-                  {/* KYC content */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">KYC Verification</CardTitle>
+                      <CardDescription>Complete your KYC to unlock all trading features</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <form onSubmit={async (e) => {
+                        e.preventDefault();
+                        toast({
+                          title: "KYC submission received",
+                          description: "Your KYC details have been submitted for verification. This usually takes 1-2 business days.",
+                        });
+                      }}>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <label htmlFor="fullName" className="text-sm font-medium">Full Name (as per ID)</label>
+                            <Input
+                              id="fullName"
+                              name="fullName"
+                              placeholder="Enter your full name"
+                              required
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <label htmlFor="dateOfBirth" className="text-sm font-medium">Date of Birth</label>
+                            <Input
+                              id="dateOfBirth"
+                              name="dateOfBirth"
+                              type="date"
+                              required
+                            />
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label htmlFor="panNumber" className="text-sm font-medium">PAN Number</label>
+                              <Input
+                                id="panNumber"
+                                name="panNumber"
+                                placeholder="ABCDE1234F"
+                                required
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <label htmlFor="aadharNumber" className="text-sm font-medium">Aadhar Number</label>
+                              <Input
+                                id="aadharNumber"
+                                name="aadharNumber"
+                                placeholder="1234 5678 9012"
+                                required
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <label htmlFor="address" className="text-sm font-medium">Address</label>
+                            <Input
+                              id="address"
+                              name="address"
+                              placeholder="Enter your address"
+                              required
+                            />
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label htmlFor="city" className="text-sm font-medium">City</label>
+                              <Input
+                                id="city"
+                                name="city"
+                                placeholder="City"
+                                required
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <label htmlFor="state" className="text-sm font-medium">State</label>
+                              <Input
+                                id="state"
+                                name="state"
+                                placeholder="State"
+                                required
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label htmlFor="postalCode" className="text-sm font-medium">Postal Code</label>
+                              <Input
+                                id="postalCode"
+                                name="postalCode"
+                                placeholder="Postal Code"
+                                required
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <label htmlFor="country" className="text-sm font-medium">Country</label>
+                              <Input
+                                id="country"
+                                name="country"
+                                defaultValue="India"
+                                readOnly
+                                className="bg-muted/50"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <label htmlFor="documentType" className="text-sm font-medium">ID Document Type</label>
+                            <select
+                              id="documentType"
+                              name="documentType"
+                              className="w-full p-2 border rounded-md"
+                              required
+                            >
+                              <option value="">Select document type</option>
+                              <option value="AADHAR">Aadhar Card</option>
+                              <option value="PAN">PAN Card</option>
+                              <option value="PASSPORT">Passport</option>
+                              <option value="DRIVING_LICENSE">Driving License</option>
+                            </select>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <label htmlFor="documentFront" className="text-sm font-medium">Upload Document Front</label>
+                            <Input
+                              id="documentFront"
+                              name="documentFront"
+                              type="file"
+                              accept="image/*"
+                              required
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <label htmlFor="documentBack" className="text-sm font-medium">Upload Document Back (if applicable)</label>
+                            <Input
+                              id="documentBack"
+                              name="documentBack"
+                              type="file"
+                              accept="image/*"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <label htmlFor="selfie" className="text-sm font-medium">Upload Selfie</label>
+                            <Input
+                              id="selfie"
+                              name="selfie"
+                              type="file"
+                              accept="image/*"
+                              required
+                            />
+                          </div>
+                          
+                          <div className="flex items-start space-x-2 mt-4">
+                            <input
+                              type="checkbox"
+                              id="consent"
+                              className="mt-1"
+                              required
+                            />
+                            <label htmlFor="consent" className="text-sm">
+                              I confirm that the information provided is accurate and I consent to the processing of my personal data for KYC verification purposes.
+                            </label>
+                          </div>
+                          
+                          <Button 
+                            type="submit" 
+                            className="w-full"
+                          >
+                            Submit KYC Details
+                          </Button>
+                        </div>
+                      </form>
+                      
+                      <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950/30 rounded-md">
+                        <h4 className="font-medium text-blue-700 dark:text-blue-400 mb-2">KYC Verification Status</h4>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                            Pending
+                          </Badge>
+                          <span className="text-sm text-muted-foreground">Your KYC verification is pending</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Note: This is a paper trading platform. KYC verification is simulated for educational purposes.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </TabsContent>
               </Tabs>
             </>
