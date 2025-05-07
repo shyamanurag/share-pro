@@ -1,0 +1,739 @@
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import Head from 'next/head';
+import { useAuth } from '@/contexts/AuthContext';
+import { TradeProvider } from '@/contexts/TradeContext';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { toast } from '@/components/ui/use-toast';
+import { 
+  Search, 
+  Bell, 
+  LogOut, 
+  Home, 
+  LineChart, 
+  BookOpen, 
+  Clock, 
+  Plus,
+  IndianRupee,
+  TrendingUp,
+  TrendingDown,
+  RefreshCw,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Filter,
+  SlidersHorizontal,
+  Eye,
+  EyeOff,
+  ArrowUpDown,
+  Layers
+} from 'lucide-react';
+import StockCard from '@/components/StockCard';
+import WatchlistStockCard from '@/components/WatchlistStockCard';
+import PortfolioItemCard from '@/components/PortfolioItemCard';
+import TransactionCard from '@/components/TransactionCard';
+import FnOPositionCard from '@/components/FnOPositionCard';
+import QuickTradeModal from '@/components/QuickTradeModal';
+import ShareModal from '@/components/ShareModal';
+
+export default function DashboardIndia() {
+  const { user, signOut } = useAuth();
+  const router = useRouter();
+  
+  // UI state
+  const [activeTab, setActiveTab] = useState('market');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showBalance, setShowBalance] = useState(true);
+  
+  // User profile state
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  
+  // Stocks state
+  const [stocks, setStocks] = useState<any[]>([]);
+  const [filteredStocks, setFilteredStocks] = useState<any[]>([]);
+  const [isLoadingStocks, setIsLoadingStocks] = useState(false);
+  
+  // Watchlist state
+  const [watchlists, setWatchlists] = useState<any[]>([]);
+  const [selectedWatchlistId, setSelectedWatchlistId] = useState<string | null>(null);
+  const [watchlistItems, setWatchlistItems] = useState<any[]>([]);
+  const [isLoadingWatchlist, setIsLoadingWatchlist] = useState(false);
+  const [isCreatingWatchlist, setIsCreatingWatchlist] = useState(false);
+  const [newWatchlistName, setNewWatchlistName] = useState('');
+  
+  // Portfolio state
+  const [portfolioItems, setPortfolioItems] = useState<any[]>([]);
+  const [portfolioValue, setPortfolioValue] = useState(0);
+  const [portfolioProfit, setPortfolioProfit] = useState(0);
+  const [portfolioProfitPercent, setPortfolioProfitPercent] = useState(0);
+  const [isLoadingPortfolio, setIsLoadingPortfolio] = useState(false);
+  const [futuresPositions, setFuturesPositions] = useState<any[]>([]);
+  const [optionsPositions, setOptionsPositions] = useState<any[]>([]);
+  const [isLoadingFnO, setIsLoadingFnO] = useState(false);
+  
+  // Transaction history state
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
+  
+  // Fetch user profile
+  const fetchUserProfile = async () => {
+    try {
+      setIsLoadingProfile(true);
+      const response = await fetch('/api/user/profile');
+      if (!response.ok) throw new Error('Failed to fetch user profile');
+      const data = await response.json();
+      setUserProfile(data.user);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load user profile",
+      });
+    } finally {
+      setIsLoadingProfile(false);
+    }
+  };
+  
+  // Fetch stocks
+  const fetchStocks = async () => {
+    try {
+      setIsLoadingStocks(true);
+      const response = await fetch('/api/stocks/india');
+      if (!response.ok) throw new Error('Failed to fetch stocks');
+      const data = await response.json();
+      setStocks(data.stocks);
+      setFilteredStocks(data.stocks);
+    } catch (error) {
+      console.error('Error fetching stocks:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load stocks",
+      });
+    } finally {
+      setIsLoadingStocks(false);
+    }
+  };
+  
+  // Fetch watchlists
+  const fetchWatchlists = async () => {
+    try {
+      setIsLoadingWatchlist(true);
+      const response = await fetch('/api/watchlists');
+      if (!response.ok) throw new Error('Failed to fetch watchlists');
+      const data = await response.json();
+      
+      setWatchlists(data.watchlists || []);
+      
+      // Select the first watchlist by default if available
+      if (data.watchlists && data.watchlists.length > 0 && !selectedWatchlistId) {
+        setSelectedWatchlistId(data.watchlists[0].id);
+        fetchWatchlistItems(data.watchlists[0].id);
+      } else if (selectedWatchlistId) {
+        fetchWatchlistItems(selectedWatchlistId);
+      }
+    } catch (error) {
+      console.error('Error fetching watchlists:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load watchlists",
+      });
+    } finally {
+      setIsLoadingWatchlist(false);
+    }
+  };
+  
+  // Fetch watchlist items
+  const fetchWatchlistItems = async (watchlistId: string) => {
+    try {
+      setIsLoadingWatchlist(true);
+      const response = await fetch(`/api/watchlists/${watchlistId}`);
+      if (!response.ok) throw new Error('Failed to fetch watchlist items');
+      const data = await response.json();
+      setWatchlistItems(data.items || []);
+    } catch (error) {
+      console.error('Error fetching watchlist items:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load watchlist items",
+      });
+    } finally {
+      setIsLoadingWatchlist(false);
+    }
+  };
+  
+  // Create new watchlist
+  const createWatchlist = async () => {
+    if (!newWatchlistName.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please enter a watchlist name",
+      });
+      return;
+    }
+    
+    try {
+      setIsCreatingWatchlist(true);
+      const response = await fetch('/api/watchlists', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: newWatchlistName }),
+      });
+      
+      if (!response.ok) throw new Error('Failed to create watchlist');
+      
+      const data = await response.json();
+      
+      toast({
+        title: "Success",
+        description: "Watchlist created successfully",
+      });
+      
+      // Reset form and refresh watchlists
+      setNewWatchlistName('');
+      fetchWatchlists();
+      
+      // Select the newly created watchlist
+      setSelectedWatchlistId(data.watchlist.id);
+    } catch (error) {
+      console.error('Error creating watchlist:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to create watchlist",
+      });
+    } finally {
+      setIsCreatingWatchlist(false);
+    }
+  };
+  
+  // Fetch portfolio data
+  const fetchPortfolio = async () => {
+    try {
+      setIsLoadingPortfolio(true);
+      const response = await fetch('/api/portfolio');
+      if (!response.ok) throw new Error('Failed to fetch portfolio');
+      const data = await response.json();
+      
+      setPortfolioItems(data.items || []);
+      setPortfolioValue(data.totalValue || 0);
+      setPortfolioProfit(data.totalProfit || 0);
+      setPortfolioProfitPercent(data.totalProfitPercent || 0);
+    } catch (error) {
+      console.error('Error fetching portfolio:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load portfolio data",
+      });
+    } finally {
+      setIsLoadingPortfolio(false);
+    }
+  };
+  
+  // Fetch F&O positions
+  const fetchFnOPositions = async () => {
+    try {
+      setIsLoadingFnO(true);
+      const response = await fetch('/api/fno/positions?type=all');
+      if (!response.ok) throw new Error('Failed to fetch F&O positions');
+      const data = await response.json();
+      
+      setFuturesPositions(data.futuresPositions || []);
+      setOptionsPositions(data.optionsPositions || []);
+    } catch (error) {
+      console.error('Error fetching F&O positions:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load F&O positions",
+      });
+    } finally {
+      setIsLoadingFnO(false);
+    }
+  };
+  
+  // Fetch transaction history
+  const fetchTransactions = async () => {
+    try {
+      setIsLoadingTransactions(true);
+      const response = await fetch('/api/transactions');
+      if (!response.ok) throw new Error('Failed to fetch transactions');
+      const data = await response.json();
+      setTransactions(data.transactions || []);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load transaction history",
+      });
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  };
+  
+  // Handle search
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value.toLowerCase();
+    setSearchQuery(query);
+    
+    if (query.trim() === '') {
+      setFilteredStocks(stocks);
+    } else {
+      const filtered = stocks.filter(
+        stock => 
+          stock.symbol.toLowerCase().includes(query) || 
+          stock.name.toLowerCase().includes(query)
+      );
+      setFilteredStocks(filtered);
+    }
+  };
+  
+  // Handle watchlist selection
+  const handleWatchlistSelect = (watchlistId: string) => {
+    setSelectedWatchlistId(watchlistId);
+    fetchWatchlistItems(watchlistId);
+  };
+  
+  // Load initial data
+  useEffect(() => {
+    if (user) {
+      fetchStocks();
+      fetchWatchlists();
+      fetchPortfolio();
+      fetchFnOPositions();
+      fetchTransactions();
+      fetchUserProfile();
+    }
+  }, [user]);
+  
+  // Redirect to login if not authenticated
+  if (!user) {
+    router.push('/login');
+    return null;
+  }
+  
+  return (
+    <TradeProvider>
+      <div className="flex flex-col min-h-screen bg-background">
+        <Head>
+          <title>Dashboard | TradePaper India</title>
+          <meta name="description" content="Indian stock market paper trading dashboard" />
+          <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        </Head>
+        
+        {/* Top Navigation */}
+        <header className="sticky top-0 z-10 bg-background border-b border-border">
+          <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div className="flex items-center">
+              <h1 className="text-xl font-bold">TradePaper India</h1>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              {userProfile && (
+                <div className="text-right">
+                  <p className="text-sm font-medium">{userProfile.name || userProfile.email}</p>
+                  <div className="flex items-center">
+                    <p className="text-sm text-muted-foreground flex items-center">
+                      <IndianRupee className="h-3 w-3" />
+                      {showBalance 
+                        ? userProfile.balance.toFixed(2) 
+                        : userProfile.balance.toString().replace(/./g, '*')}
+                    </p>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 ml-1"
+                      onClick={() => setShowBalance(!showBalance)}
+                    >
+                      {showBalance ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => signOut()}
+              >
+                <LogOut className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+        </header>
+        
+        {/* Main Content */}
+        <main className="flex-1 container mx-auto px-4 py-6 pb-20">
+          <div className="space-y-6">
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                className="pl-10"
+                placeholder="Search stocks..."
+                value={searchQuery}
+                onChange={handleSearch}
+              />
+            </div>
+            
+            {/* Main Tabs */}
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="market">Market</TabsTrigger>
+                <TabsTrigger value="watchlist">Watchlist</TabsTrigger>
+                <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
+                <TabsTrigger value="history">History</TabsTrigger>
+              </TabsList>
+              
+              <div className="mt-6">
+                {/* Market Tab */}
+                <TabsContent value="market" className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h2 className="text-2xl font-bold">Market</h2>
+                      <p className="text-muted-foreground">Explore and trade stocks</p>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={fetchStocks}
+                      disabled={isLoadingStocks}
+                    >
+                      {isLoadingStocks ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {isLoadingStocks ? (
+                      <div className="flex justify-center py-8">
+                        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+                      </div>
+                    ) : filteredStocks.length > 0 ? (
+                      filteredStocks.map(stock => (
+                        <StockCard key={stock.id} stock={stock} />
+                      ))
+                    ) : (
+                      <Card>
+                        <CardContent className="p-6 text-center">
+                          <p className="text-muted-foreground">No stocks found matching your search.</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                </TabsContent>
+                
+                {/* Watchlist Tab */}
+                <TabsContent value="watchlist" className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h2 className="text-2xl font-bold">Watchlist</h2>
+                      <p className="text-muted-foreground">Track your favorite stocks</p>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => selectedWatchlistId && fetchWatchlistItems(selectedWatchlistId)}
+                      disabled={isLoadingWatchlist}
+                    >
+                      {isLoadingWatchlist ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  
+                  {/* Watchlist Selection */}
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {watchlists.map(watchlist => (
+                      <Button
+                        key={watchlist.id}
+                        variant={selectedWatchlistId === watchlist.id ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleWatchlistSelect(watchlist.id)}
+                      >
+                        {watchlist.name}
+                      </Button>
+                    ))}
+                    
+                    {/* Create New Watchlist */}
+                    <div className="flex items-center gap-2 mt-2 w-full">
+                      <Input
+                        placeholder="New watchlist name..."
+                        value={newWatchlistName}
+                        onChange={(e) => setNewWatchlistName(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={createWatchlist}
+                        disabled={isCreatingWatchlist || !newWatchlistName.trim()}
+                      >
+                        {isCreatingWatchlist ? (
+                          <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Plus className="h-4 w-4 mr-2" />
+                        )}
+                        Create
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {/* Watchlist Items */}
+                  <div className="space-y-4">
+                    {selectedWatchlistId ? (
+                      isLoadingWatchlist ? (
+                        <div className="flex justify-center py-8">
+                          <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                      ) : watchlistItems.length > 0 ? (
+                        watchlistItems.map(item => (
+                          <WatchlistStockCard key={item.id} item={item} onRemove={() => selectedWatchlistId && fetchWatchlistItems(selectedWatchlistId)} />
+                        ))
+                      ) : (
+                        <Card>
+                          <CardContent className="p-6 text-center">
+                            <p className="text-muted-foreground mb-4">No stocks in this watchlist yet.</p>
+                            <Button onClick={() => setActiveTab('market')}>
+                              Add Stocks
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      )
+                    ) : (
+                      <Card>
+                        <CardContent className="p-6 text-center">
+                          <p className="text-muted-foreground mb-4">Create a watchlist to start tracking stocks.</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                </TabsContent>
+                
+                {/* Portfolio Tab */}
+                <TabsContent value="portfolio" className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h2 className="text-2xl font-bold">Portfolio</h2>
+                      <p className="text-muted-foreground">Your investment holdings</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          fetchPortfolio();
+                          fetchFnOPositions();
+                        }}
+                        disabled={isLoadingPortfolio || isLoadingFnO}
+                      >
+                        {isLoadingPortfolio || isLoadingFnO ? (
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Total Value</p>
+                          <p className="text-2xl font-bold flex items-center">
+                            <IndianRupee className="h-5 w-5 mr-1" />
+                            {portfolioValue.toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Total P&L</p>
+                          <div className="flex items-center">
+                            <p className={`text-2xl font-bold ${portfolioProfit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                              {portfolioProfit >= 0 ? '+' : ''}
+                              <IndianRupee className="h-5 w-5 inline" />
+                              {portfolioProfit.toFixed(2)}
+                            </p>
+                            <p className={`ml-2 ${portfolioProfit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                              ({portfolioProfit >= 0 ? '+' : ''}{portfolioProfitPercent.toFixed(2)}%)
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Tabs defaultValue="stocks">
+                    <TabsList className="grid w-full grid-cols-3 mb-4">
+                      <TabsTrigger value="stocks">Stocks</TabsTrigger>
+                      <TabsTrigger value="futures">Futures</TabsTrigger>
+                      <TabsTrigger value="options">Options</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="stocks" className="space-y-4">
+                      {portfolioItems.length > 0 ? (
+                        portfolioItems.map(item => (
+                          <PortfolioItemCard key={item.id} item={item} />
+                        ))
+                      ) : (
+                        <Card>
+                          <CardContent className="p-6 text-center">
+                            <p className="text-muted-foreground mb-4">You don't have any stocks in your portfolio yet.</p>
+                            <Button onClick={() => setActiveTab('market')}>
+                              Explore Stocks
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
+                    
+                    <TabsContent value="futures" className="space-y-4">
+                      {futuresPositions.length > 0 ? (
+                        futuresPositions.map(position => (
+                          <FnOPositionCard key={position.id} position={position} type="FUTURES" />
+                        ))
+                      ) : (
+                        <Card>
+                          <CardContent className="p-6 text-center">
+                            <p className="text-muted-foreground mb-4">You don't have any futures positions yet.</p>
+                            <Button onClick={() => router.push('/advanced-trading')}>
+                              <ArrowUpDown className="mr-2 h-4 w-4" />
+                              Trade Futures
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
+                    
+                    <TabsContent value="options" className="space-y-4">
+                      {optionsPositions.length > 0 ? (
+                        optionsPositions.map(position => (
+                          <FnOPositionCard key={position.id} position={position} type="OPTIONS" />
+                        ))
+                      ) : (
+                        <Card>
+                          <CardContent className="p-6 text-center">
+                            <p className="text-muted-foreground mb-4">You don't have any options positions yet.</p>
+                            <Button onClick={() => router.push('/advanced-trading')}>
+                              <Layers className="mr-2 h-4 w-4" />
+                              Trade Options
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                </TabsContent>
+                
+                {/* History Tab */}
+                <TabsContent value="history" className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h2 className="text-2xl font-bold">History</h2>
+                      <p className="text-muted-foreground">Your transaction history</p>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={fetchTransactions}
+                      disabled={isLoadingTransactions}
+                    >
+                      {isLoadingTransactions ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {isLoadingTransactions ? (
+                      <div className="flex justify-center py-8">
+                        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+                      </div>
+                    ) : transactions.length > 0 ? (
+                      transactions.map(transaction => (
+                        <TransactionCard key={transaction.id} transaction={transaction} />
+                      ))
+                    ) : (
+                      <Card>
+                        <CardContent className="p-6 text-center">
+                          <p className="text-muted-foreground mb-4">No transaction history yet.</p>
+                          <Button onClick={() => setActiveTab('market')}>
+                            Start Trading
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                </TabsContent>
+              </div>
+            </Tabs>
+          </div>
+        </main>
+        
+        {/* Bottom Navigation */}
+        <nav className="fixed bottom-0 left-0 right-0 bg-background border-t border-border py-2 px-4 z-10">
+          <div className="container mx-auto">
+            <div className="flex justify-around items-center">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className={activeTab === 'market' ? 'text-primary' : 'text-muted-foreground'}
+                onClick={() => setActiveTab('market')}
+              >
+                <Home className="h-5 w-5" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className={activeTab === 'watchlist' ? 'text-primary' : 'text-muted-foreground'}
+                onClick={() => setActiveTab('watchlist')}
+              >
+                <BookOpen className="h-5 w-5" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className={activeTab === 'portfolio' ? 'text-primary' : 'text-muted-foreground'}
+                onClick={() => setActiveTab('portfolio')}
+              >
+                <LineChart className="h-5 w-5" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className={activeTab === 'history' ? 'text-primary' : 'text-muted-foreground'}
+                onClick={() => setActiveTab('history')}
+              >
+                <Clock className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+        </nav>
+        
+        {/* Modals */}
+        <QuickTradeModal />
+        <ShareModal />
+      </div>
+    </TradeProvider>
+  );
+}

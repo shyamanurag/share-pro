@@ -1754,23 +1754,43 @@ export default function AdvancedTrading() {
                       </div>
                     </CardContent>
                     <CardFooter>
-                      <Button 
-                        className="w-full"
-                        onClick={executeFuturesTrade}
-                        disabled={isLoading || !selectedStock || !futuresState.selectedContractId}
-                      >
-                        {isLoading ? (
-                          <>
-                            <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                            Executing Trade...
-                          </>
-                        ) : (
-                          <>
-                            <ArrowUpDown className="mr-2 h-4 w-4" />
-                            Execute Futures Trade
-                          </>
+                      <div className="flex gap-2">
+                        <Button 
+                          className="flex-1"
+                          onClick={executeFuturesTrade}
+                          disabled={isLoading || !selectedStock || !futuresState.selectedContractId}
+                        >
+                          {isLoading ? (
+                            <>
+                              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                              Executing Trade...
+                            </>
+                          ) : (
+                            <>
+                              <ArrowUpDown className="mr-2 h-4 w-4" />
+                              Execute Futures Trade
+                            </>
+                          )}
+                        </Button>
+                        
+                        {selectedStock && futuresState.selectedContractId && (
+                          <Button 
+                            variant="outline"
+                            onClick={() => {
+                              const contract = futuresContracts.find(c => c.id === futuresState.selectedContractId);
+                              if (contract && selectedStock) {
+                                // Import dynamically to avoid circular dependencies
+                                import('@/contexts/TradeContext').then(({ useTrade }) => {
+                                  const { openFuturesTradeModal } = useTrade();
+                                  openFuturesTradeModal(selectedStock, contract, futuresState.type);
+                                });
+                              }
+                            }}
+                          >
+                            Use Quick Trade
+                          </Button>
                         )}
-                      </Button>
+                      </div>
                     </CardFooter>
                   </Card>
                 </TabsContent>
@@ -2015,23 +2035,43 @@ export default function AdvancedTrading() {
                       </div>
                     </CardContent>
                     <CardFooter>
-                      <Button 
-                        className="w-full"
-                        onClick={executeOptionsTrade}
-                        disabled={isLoading || !selectedStock || !optionsState.selectedContractId}
-                      >
-                        {isLoading ? (
-                          <>
-                            <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                            Executing Trade...
-                          </>
-                        ) : (
-                          <>
-                            <Layers className="mr-2 h-4 w-4" />
-                            Execute Options Trade
-                          </>
+                      <div className="flex gap-2">
+                        <Button 
+                          className="flex-1"
+                          onClick={executeOptionsTrade}
+                          disabled={isLoading || !selectedStock || !optionsState.selectedContractId}
+                        >
+                          {isLoading ? (
+                            <>
+                              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                              Executing Trade...
+                            </>
+                          ) : (
+                            <>
+                              <Layers className="mr-2 h-4 w-4" />
+                              Execute Options Trade
+                            </>
+                          )}
+                        </Button>
+                        
+                        {selectedStock && optionsState.selectedContractId && (
+                          <Button 
+                            variant="outline"
+                            onClick={() => {
+                              const contract = optionsContracts.find(c => c.id === optionsState.selectedContractId);
+                              if (contract && selectedStock) {
+                                // Import dynamically to avoid circular dependencies
+                                import('@/contexts/TradeContext').then(({ useTrade }) => {
+                                  const { openOptionsTradeModal } = useTrade();
+                                  openOptionsTradeModal(selectedStock, contract, optionsState.type);
+                                });
+                              }
+                            }}
+                          >
+                            Use Quick Trade
+                          </Button>
                         )}
-                      </Button>
+                      </div>
                     </CardFooter>
                   </Card>
                 </TabsContent>
