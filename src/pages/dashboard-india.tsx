@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTrade } from "@/contexts/TradeContext";
 import { useRouter } from "next/router";
@@ -42,7 +42,13 @@ import {
   Zap,
   ChevronDown,
   ChevronUp,
-  BarChart2
+  BarChart2,
+  Camera,
+  Upload,
+  X,
+  Check,
+  CreditCard,
+  Smartphone
 } from "lucide-react";
 import prisma from "@/lib/prisma";
 
@@ -148,6 +154,19 @@ export default function Dashboard() {
   const [optionsContracts, setOptionsContracts] = useState<any[]>([]);
   const [selectedOptionsContract, setSelectedOptionsContract] = useState<any>(null);
   const [optionsType, setOptionsType] = useState<'CALL' | 'PUT'>('CALL');
+  
+  // New state for profile photo upload
+  const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
+  const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
+  const profilePhotoInputRef = useRef<HTMLInputElement>(null);
+  
+  // New state for KYC document uploads
+  const [documentFrontFile, setDocumentFrontFile] = useState<File | null>(null);
+  const [documentFrontPreview, setDocumentFrontPreview] = useState<string | null>(null);
+  const [documentBackFile, setDocumentBackFile] = useState<File | null>(null);
+  const [documentBackPreview, setDocumentBackPreview] = useState<string | null>(null);
+  const [selfieFile, setSelfieFile] = useState<File | null>(null);
+  const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
 
   // Fetch stocks
   const fetchStocks = async () => {
@@ -255,6 +274,58 @@ export default function Dashboard() {
       fetchUserProfile();
     }
   }, [user, router]);
+
+  // Handle profile photo change
+  const handleProfilePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setProfilePhotoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfilePhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle document front upload
+  const handleDocumentFrontChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setDocumentFrontFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setDocumentFrontPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle document back upload
+  const handleDocumentBackChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setDocumentBackFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setDocumentBackPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle selfie upload
+  const handleSelfieChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelfieFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelfiePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Filter stocks based on search query
   const filteredStocks = stocks.filter(stock => 
@@ -2019,7 +2090,7 @@ export default function Dashboard() {
                   }}
                   className="flex items-center gap-1"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-save"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="roun" strokeLinejoin="round" className="lucide lucide-save"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                   Save
                 </Button>
               </div>
@@ -2036,20 +2107,61 @@ export default function Dashboard() {
                   <Card className="mb-6">
                     <CardContent className="p-6">
                       <div className="flex flex-col items-center mb-6">
-                        <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4 relative group">
-                          {userProfile?.avatarUrl ? (
+                        <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-4 relative group overflow-hidden">
+                          {profilePhotoPreview || userProfile?.avatarUrl ? (
                             <img 
-                              src={userProfile.avatarUrl} 
+                              src={profilePhotoPreview || userProfile?.avatarUrl || ""} 
                               alt="Profile" 
                               className="w-full h-full rounded-full object-cover"
                             />
                           ) : (
-                            <User className="w-10 h-10 text-muted-foreground" />
+                            <User className="w-12 h-12 text-muted-foreground" />
                           )}
-                          <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-camera"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                          <div 
+                            className="absolute inset-0 bg-black bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
+                            onClick={() => profilePhotoInputRef.current?.click()}
+                          >
+                            <Camera className="w-6 h-6 text-white" />
                           </div>
+                          <input 
+                            type="file" 
+                            ref={profilePhotoInputRef}
+                            className="hidden" 
+                            accept="image/*"
+                            onChange={handleProfilePhotoChange}
+                          />
                         </div>
+                        
+                        {profilePhotoPreview && (
+                          <div className="flex items-center gap-2 mb-4">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                setProfilePhotoPreview(null);
+                                setProfilePhotoFile(null);
+                                if (profilePhotoInputRef.current) {
+                                  profilePhotoInputRef.current.value = '';
+                                }
+                              }}
+                            >
+                              <X className="w-4 h-4 mr-1" /> Cancel
+                            </Button>
+                            <Button 
+                              size="sm"
+                              onClick={() => {
+                                // Here we would upload the photo to the server
+                                toast({
+                                  title: "Profile photo updated",
+                                  description: "Your profile photo has been updated successfully",
+                                });
+                              }}
+                            >
+                              <Check className="w-4 h-4 mr-1" /> Save Photo
+                            </Button>
+                          </div>
+                        )}
+                        
                         <div className="space-y-2 w-full max-w-xs">
                           <div className="space-y-1">
                             <label htmlFor="name" className="text-sm font-medium">Name</label>
@@ -2155,120 +2267,442 @@ export default function Dashboard() {
                   </div>
                 </TabsContent>
                 
-                {/* Other tabs content remains the same */}
                 <TabsContent value="add-money">
-                  <Card className="mb-6">
-                    <CardHeader>
-                      <CardTitle className="text-lg">Add Money to Your Account</CardTitle>
-                      <CardDescription>Add funds to your paper trading account</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <form onSubmit={async (e) => {
-                        e.preventDefault();
-                        const formData = new FormData(e.currentTarget);
-                        const amount = formData.get('amount') as string;
-                        const paymentMethod = formData.get('paymentMethod') as string;
-                        
-                        if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-                          toast({
-                            variant: "destructive",
-                            title: "Invalid amount",
-                            description: "Please enter a valid amount greater than 0",
-                          });
-                          return;
-                        }
-                        
-                        try {
-                          setIsLoading(true);
-                          const response = await fetch('/api/user/add-money', {
-                            method: 'POST',
-                            headers: {
-                              'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                              amount: parseFloat(amount),
-                              paymentMethod,
-                            }),
-                          });
-                          
-                          if (!response.ok) {
-                            const error = await response.json();
-                            throw new Error(error.error || 'Failed to add money');
-                          }
-                          
-                          const data = await response.json();
-                          
-                          // Update user profile with new balance
-                          setUserProfile(data.user);
-                          
-                          toast({
-                            title: "Money added successfully",
-                            description: data.message,
-                          });
-                          
-                          // Reset form
-                          e.currentTarget.reset();
-                        } catch (error: any) {
-                          toast({
-                            variant: "destructive",
-                            title: "Error",
-                            description: error.message || "Failed to add money",
-                          });
-                        } finally {
-                          setIsLoading(false);
-                        }
-                      }}>
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <label htmlFor="amount" className="text-sm font-medium">Amount (₹)</label>
-                            <Input
-                              id="amount"
-                              name="amount"
-                              type="number"
-                              min="100"
-                              step="100"
-                              placeholder="Enter amount"
-                              required
-                            />
+                  <Tabs defaultValue="amount" className="mb-6">
+                    <TabsList className="grid w-full grid-cols-3">
+                      <TabsTrigger value="amount" id="amount-tab-trigger">Amount</TabsTrigger>
+                      <TabsTrigger value="upi" id="upi-tab-trigger">UPI</TabsTrigger>
+                      <TabsTrigger value="card" id="card-tab-trigger">Card</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="amount">
+                      <Card className="mb-6">
+                        <CardHeader>
+                          <CardTitle className="text-lg">Add Money to Your Account</CardTitle>
+                          <CardDescription>Add funds to your paper trading account</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <form id="addMoneyForm" onSubmit={async (e) => {
+                            e.preventDefault();
+                            const formData = new FormData(e.currentTarget);
+                            const amount = formData.get('amount') as string;
+                            const paymentMethod = formData.get('paymentMethod') as string;
+                            
+                            if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+                              toast({
+                                variant: "destructive",
+                                title: "Invalid amount",
+                                description: "Please enter a valid amount greater than 0",
+                              });
+                              return;
+                            }
+                            
+                            // Store amount in session storage to use in next steps
+                            sessionStorage.setItem('addMoneyAmount', amount);
+                            sessionStorage.setItem('addMoneyMethod', paymentMethod);
+                            
+                            // Move to next tab based on payment method
+                            if (paymentMethod === 'UPI') {
+                              document.getElementById('upi-tab-trigger')?.click();
+                            } else if (paymentMethod === 'CARD') {
+                              document.getElementById('card-tab-trigger')?.click();
+                            }
+                          }}>
+                            <div className="space-y-4">
+                              <div className="space-y-2">
+                                <label htmlFor="amount" className="text-sm font-medium">Amount (₹)</label>
+                                <Input
+                                  id="amount"
+                                  name="amount"
+                                  type="number"
+                                  min="100"
+                                  step="100"
+                                  placeholder="Enter amount"
+                                  required
+                                  className="w-full"
+                                />
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <label htmlFor="paymentMethod" className="text-sm font-medium">Payment Method</label>
+                                <select
+                                  id="paymentMethod"
+                                  name="paymentMethod"
+                                  className="w-full p-2 border rounded-md"
+                                  required
+                                >
+                                  <option value="UPI">UPI</option>
+                                  <option value="CARD">Credit/Debit Card</option>
+                                </select>
+                              </div>
+                              
+                              <div className="grid grid-cols-3 gap-4 mt-6">
+                                <Button 
+                                  type="button" 
+                                  variant="outline"
+                                  className="w-full"
+                                  onClick={() => {
+                                    const amountInput = document.getElementById('amount') as HTMLInputElement;
+                                    if (amountInput) amountInput.value = "1000";
+                                  }}
+                                >
+                                  ₹1,000
+                                </Button>
+                                <Button 
+                                  type="button" 
+                                  variant="outline"
+                                  className="w-full"
+                                  onClick={() => {
+                                    const amountInput = document.getElementById('amount') as HTMLInputElement;
+                                    if (amountInput) amountInput.value = "5000";
+                                  }}
+                                >
+                                  ₹5,000
+                                </Button>
+                                <Button 
+                                  type="button" 
+                                  variant="outline"
+                                  className="w-full"
+                                  onClick={() => {
+                                    const amountInput = document.getElementById('amount') as HTMLInputElement;
+                                    if (amountInput) amountInput.value = "10000";
+                                  }}
+                                >
+                                  ₹10,000
+                                </Button>
+                              </div>
+                              
+                              <Button 
+                                type="submit" 
+                                className="w-full bg-green-500 hover:bg-green-600 mt-4"
+                              >
+                                <span className="flex items-center">
+                                  <IndianRupee className="w-4 h-4 mr-2" />
+                                  Continue
+                                </span>
+                              </Button>
+                            </div>
+                          </form>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                    
+                    <TabsContent value="upi" id="upi-tab">
+                      <Card className="mb-6">
+                        <CardHeader>
+                          <CardTitle className="text-lg">UPI Payment</CardTitle>
+                          <CardDescription>Complete your payment using UPI</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-6">
+                            <div className="text-center">
+                              <div className="bg-gray-100 p-4 rounded-lg mx-auto w-48 h-48 flex items-center justify-center mb-4">
+                                <img src="/images/rect.png" alt="QR Code" className="w-full h-full object-contain" />
+                              </div>
+                              <p className="text-sm text-muted-foreground mb-2">Scan QR code with any UPI app</p>
+                              <p className="font-medium text-lg" id="upi-amount">
+                                Amount: ₹<span id="display-upi-amount">0</span>
+                              </p>
+                            </div>
+                            
+                            <div className="space-y-4">
+                              <div className="space-y-2">
+                                <label htmlFor="upiId" className="text-sm font-medium">UPI ID</label>
+                                <div className="flex">
+                                  <Input
+                                    id="upiId"
+                                    name="upiId"
+                                    placeholder="yourname@upi"
+                                    className="rounded-r-none"
+                                  />
+                                  <Button className="rounded-l-none bg-green-500 hover:bg-green-600">
+                                    Verify
+                                  </Button>
+                                </div>
+                              </div>
+                              
+                              <div className="flex flex-col space-y-2">
+                                <p className="text-sm font-medium">Or pay using</p>
+                                <div className="grid grid-cols-4 gap-4">
+                                  <div className="bg-gray-100 p-2 rounded-md text-center cursor-pointer hover:bg-gray-200">
+                                    <div className="w-10 h-10 mx-auto mb-1 bg-white rounded-full flex items-center justify-center">
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 0 0 5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 1 0 5H18"/><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2z"/><path d="M10 7v10"/><path d="M14 7v10"/></svg>
+                                    </div>
+                                    <p className="text-xs">PhonePe</p>
+                                  </div>
+                                  <div className="bg-gray-100 p-2 rounded-md text-center cursor-pointer hover:bg-gray-200">
+                                    <div className="w-10 h-10 mx-auto mb-1 bg-white rounded-full flex items-center justify-center">
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>
+                                    </div>
+                                    <p className="text-xs">GPay</p>
+                                  </div>
+                                  <div className="bg-gray-100 p-2 rounded-md text-center cursor-pointer hover:bg-gray-200">
+                                    <div className="w-10 h-10 mx-auto mb-1 bg-white rounded-full flex items-center justify-center">
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
+                                    </div>
+                                    <p className="text-xs">Paytm</p>
+                                  </div>
+                                  <div className="bg-gray-100 p-2 rounded-md text-center cursor-pointer hover:bg-gray-200">
+                                    <div className="w-10 h-10 mx-auto mb-1 bg-white rounded-full flex items-center justify-center">
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
+                                    </div>
+                                    <p className="text-xs">Amazon</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="flex space-x-4 mt-6">
+                              <Button 
+                                variant="outline" 
+                                className="w-1/2"
+                                onClick={() => {
+                                  document.getElementById('amount-tab-trigger')?.click();
+                                }}
+                              >
+                                Back
+                              </Button>
+                              <Button 
+                                className="w-1/2 bg-green-500 hover:bg-green-600"
+                                onClick={async () => {
+                                  try {
+                                    setIsLoading(true);
+                                    const amount = sessionStorage.getItem('addMoneyAmount') || "0";
+                                    
+                                    const response = await fetch('/api/user/add-money', {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({
+                                        amount: parseFloat(amount),
+                                        paymentMethod: 'UPI',
+                                      }),
+                                    });
+                                    
+                                    if (!response.ok) {
+                                      const error = await response.json();
+                                      throw new Error(error.error || 'Failed to add money');
+                                    }
+                                    
+                                    const data = await response.json();
+                                    
+                                    // Update user profile with new balance
+                                    setUserProfile(data.user);
+                                    
+                                    toast({
+                                      title: "Money added successfully",
+                                      description: data.message,
+                                    });
+                                    
+                                    // Reset form and go back to amount tab
+                                    document.getElementById('amount-tab-trigger')?.click();
+                                    (document.getElementById('addMoneyForm') as HTMLFormElement)?.reset();
+                                    sessionStorage.removeItem('addMoneyAmount');
+                                    sessionStorage.removeItem('addMoneyMethod');
+                                    
+                                  } catch (error: any) {
+                                    toast({
+                                      variant: "destructive",
+                                      title: "Error",
+                                      description: error.message || "Failed to add money",
+                                    });
+                                  } finally {
+                                    setIsLoading(false);
+                                  }
+                                }}
+                              >
+                                {isLoading ? (
+                                  <span className="flex items-center">
+                                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Processing...
+                                  </span>
+                                ) : (
+                                  <span>Pay Now</span>
+                                )}
+                              </Button>
+                            </div>
                           </div>
-                          
-                          <div className="space-y-2">
-                            <label htmlFor="paymentMethod" className="text-sm font-medium">Payment Method</label>
-                            <select
-                              id="paymentMethod"
-                              name="paymentMethod"
-                              className="w-full p-2 border rounded-md"
-                              required
-                            >
-                              <option value="UPI">UPI</option>
-                              <option value="CARD">Credit/Debit Card</option>
-                            </select>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                    
+                    <TabsContent value="card" id="card-tab">
+                      <Card className="mb-6">
+                        <CardHeader>
+                          <CardTitle className="text-lg">Card Payment</CardTitle>
+                          <CardDescription>Complete your payment using Credit/Debit Card</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            <div className="text-center mb-4">
+                              <p className="font-medium text-lg" id="card-amount">
+                                Amount: ₹<span id="display-card-amount">0</span>
+                              </p>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <label htmlFor="cardNumber" className="text-sm font-medium">Card Number</label>
+                              <Input
+                                id="cardNumber"
+                                name="cardNumber"
+                                placeholder="1234 5678 9012 3456"
+                                maxLength={19}
+                                className="w-full"
+                                onChange={(e) => {
+                                  // Format card number with spaces
+                                  let value = e.target.value.replace(/\s/g, '');
+                                  if (value.length > 0) {
+                                    value = value.match(new RegExp('.{1,4}', 'g'))?.join(' ') || '';
+                                  }
+                                  e.target.value = value;
+                                }}
+                              />
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <label htmlFor="expiryDate" className="text-sm font-medium">Expiry Date</label>
+                                <Input
+                                  id="expiryDate"
+                                  name="expiryDate"
+                                  placeholder="MM/YY"
+                                  maxLength={5}
+                                  className="w-full"
+                                  onChange={(e) => {
+                                    // Format expiry date
+                                    let value = e.target.value.replace(/\D/g, '');
+                                    if (value.length > 2) {
+                                      value = value.slice(0, 2) + '/' + value.slice(2, 4);
+                                    }
+                                    e.target.value = value;
+                                  }}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <label htmlFor="cvv" className="text-sm font-medium">CVV</label>
+                                <Input
+                                  id="cvv"
+                                  name="cvv"
+                                  type="password"
+                                  placeholder="123"
+                                  maxLength={3}
+                                  className="w-full"
+                                />
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <label htmlFor="nameOnCard" className="text-sm font-medium">Name on Card</label>
+                              <Input
+                                id="nameOnCard"
+                                name="nameOnCard"
+                                placeholder="John Doe"
+                                className="w-full"
+                              />
+                            </div>
+                            
+                            <div className="flex items-center space-x-2 mt-4">
+                              <input type="checkbox" id="saveCard" className="rounded" />
+                              <label htmlFor="saveCard" className="text-sm">Save card for future payments</label>
+                            </div>
+                            
+                            <div className="flex space-x-4 mt-6">
+                              <Button 
+                                variant="outline" 
+                                className="w-1/2"
+                                onClick={() => {
+                                  document.getElementById('amount-tab-trigger')?.click();
+                                }}
+                              >
+                                Back
+                              </Button>
+                              <Button 
+                                className="w-1/2 bg-green-500 hover:bg-green-600"
+                                onClick={async () => {
+                                  try {
+                                    setIsLoading(true);
+                                    const amount = sessionStorage.getItem('addMoneyAmount') || "0";
+                                    
+                                    const response = await fetch('/api/user/add-money', {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({
+                                        amount: parseFloat(amount),
+                                        paymentMethod: 'CARD',
+                                      }),
+                                    });
+                                    
+                                    if (!response.ok) {
+                                      const error = await response.json();
+                                      throw new Error(error.error || 'Failed to add money');
+                                    }
+                                    
+                                    const data = await response.json();
+                                    
+                                    // Update user profile with new balance
+                                    setUserProfile(data.user);
+                                    
+                                    toast({
+                                      title: "Money added successfully",
+                                      description: data.message,
+                                    });
+                                    
+                                    // Reset form and go back to amount tab
+                                    document.getElementById('amount-tab-trigger')?.click();
+                                    (document.getElementById('addMoneyForm') as HTMLFormElement)?.reset();
+                                    sessionStorage.removeItem('addMoneyAmount');
+                                    sessionStorage.removeItem('addMoneyMethod');
+                                    
+                                  } catch (error: any) {
+                                    toast({
+                                      variant: "destructive",
+                                      title: "Error",
+                                      description: error.message || "Failed to add money",
+                                    });
+                                  } finally {
+                                    setIsLoading(false);
+                                  }
+                                }}
+                              >
+                                {isLoading ? (
+                                  <span className="flex items-center">
+                                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Processing...
+                                  </span>
+                                ) : (
+                                  <span>Pay Now</span>
+                                )}
+                              </Button>
+                            </div>
+                            
+                            <div className="flex items-center justify-center space-x-4 mt-4">
+                              <div className="h-6 w-10 bg-gray-200 rounded flex items-center justify-center">
+                                <CreditCard className="w-4 h-4" />
+                              </div>
+                              <div className="h-6 w-10 bg-gray-200 rounded flex items-center justify-center">
+                                <CreditCard className="w-4 h-4" />
+                              </div>
+                              <div className="h-6 w-10 bg-gray-200 rounded flex items-center justify-center">
+                                <CreditCard className="w-4 h-4" />
+                              </div>
+                              <div className="h-6 w-10 bg-gray-200 rounded flex items-center justify-center">
+                                <CreditCard className="w-4 h-4" />
+                              </div>
+                            </div>
                           </div>
-                          
-                          <Button 
-                            type="submit" 
-                            className="w-full bg-green-500 hover:bg-green-600"
-                            disabled={isLoading}
-                          >
-                            {isLoading ? (
-                              <span className="flex items-center">
-                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Processing...
-                              </span>
-                            ) : (
-                              <span className="flex items-center">
-                                <IndianRupee className="w-4 h-4 mr-2" />
-                                Add Money
-                              </span>
-                            )}
-                          </Button>
-                        </div>
-                      </form>
-                    </CardContent>
-                  </Card>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                  </Tabs>
                   
                   <Card>
                     <CardHeader>
@@ -2277,7 +2711,7 @@ export default function Dashboard() {
                     <CardContent>
                       <div className="space-y-4">
                         {transactions.filter(t => t.type === 'ADD_MONEY').length > 0 ? (
-                          transactions.filter(t => t.type === 'ADD_MONEY').slice(0, 5).map((transaction, index) => (
+                          transactions.filter(t => t.type === 'ADD_MONEY').slice(0,5).map((transaction, index) => (
                             <div key={index} className="flex justify-between items-center p-3 bg-muted/30 rounded-md">
                               <div>
                                 <p className="font-medium">Added ₹{transaction.total.toFixed(2)}</p>
@@ -2296,6 +2730,30 @@ export default function Dashboard() {
                       </div>
                     </CardContent>
                   </Card>
+                  
+                  {/* Add script to update amount display in UPI and Card tabs */}
+                  <script dangerouslySetInnerHTML={{
+                    __html: `
+                      // Update amount display when tabs change
+                      document.addEventListener('DOMContentLoaded', function() {
+                        const updateAmountDisplays = function() {
+                          const amount = sessionStorage.getItem('addMoneyAmount') || "0";
+                          document.getElementById('display-upi-amount').textContent = amount;
+                          document.getElementById('display-card-amount').textContent = amount;
+                        };
+                        
+                        // Set up MutationObserver to detect tab changes
+                        const tabsContainer = document.querySelector('[role="tablist"]');
+                        if (tabsContainer) {
+                          const observer = new MutationObserver(updateAmountDisplays);
+                          observer.observe(tabsContainer, { attributes: true, subtree: true });
+                        }
+                        
+                        // Initial update
+                        updateAmountDisplays();
+                      });
+                    `
+                  }} />
                 </TabsContent>
                 
                 <TabsContent value="risk-profile">
@@ -2566,6 +3024,26 @@ export default function Dashboard() {
                     <CardContent>
                       <form onSubmit={async (e) => {
                         e.preventDefault();
+                        
+                        // Check if document uploads are provided
+                        if (!documentFrontFile) {
+                          toast({
+                            variant: "destructive",
+                            title: "Missing document",
+                            description: "Please upload the front side of your ID document",
+                          });
+                          return;
+                        }
+                        
+                        if (!selfieFile) {
+                          toast({
+                            variant: "destructive",
+                            title: "Missing selfie",
+                            description: "Please upload a selfie for verification",
+                          });
+                          return;
+                        }
+                        
                         toast({
                           title: "KYC submission received",
                           description: "Your KYC details have been submitted for verification. This usually takes 1-2 business days.",
@@ -2685,36 +3163,167 @@ export default function Dashboard() {
                             </select>
                           </div>
                           
+                          {/* Document Front Upload with Preview */}
                           <div className="space-y-2">
                             <label htmlFor="documentFront" className="text-sm font-medium">Upload Document Front</label>
-                            <Input
-                              id="documentFront"
-                              name="documentFront"
-                              type="file"
-                              accept="image/*"
-                              required
-                            />
+                            <div className="flex flex-col items-center p-4 border-2 border-dashed rounded-md border-gray-300 hover:border-gray-400 transition-colors">
+                              {documentFrontPreview ? (
+                                <div className="relative w-full">
+                                  <img 
+                                    src={documentFrontPreview} 
+                                    alt="Document Front" 
+                                    className="w-full h-40 object-contain mb-2"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    className="absolute top-0 right-0"
+                                    onClick={() => {
+                                      setDocumentFrontPreview(null);
+                                      setDocumentFrontFile(null);
+                                    }}
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <>
+                                  <Upload className="w-10 h-10 text-gray-400 mb-2" />
+                                  <p className="text-sm text-gray-500 mb-1">Click to upload or drag and drop</p>
+                                  <p className="text-xs text-gray-400">PNG, JPG or PDF (max. 5MB)</p>
+                                  <Input
+                                    id="documentFront"
+                                    name="documentFront"
+                                    type="file"
+                                    accept="image/*,.pdf"
+                                    className="hidden"
+                                    onChange={handleDocumentFrontChange}
+                                  />
+                                  <Button 
+                                    type="button" 
+                                    variant="outline" 
+                                    className="mt-2"
+                                    onClick={() => document.getElementById('documentFront')?.click()}
+                                  >
+                                    Select File
+                                  </Button>
+                                </>
+                              )}
+                            </div>
                           </div>
                           
+                          {/* Document Back Upload with Preview */}
                           <div className="space-y-2">
                             <label htmlFor="documentBack" className="text-sm font-medium">Upload Document Back (if applicable)</label>
-                            <Input
-                              id="documentBack"
-                              name="documentBack"
-                              type="file"
-                              accept="image/*"
-                            />
+                            <div className="flex flex-col items-center p-4 border-2 border-dashed rounded-md border-gray-300 hover:border-gray-400 transition-colors">
+                              {documentBackPreview ? (
+                                <div className="relative w-full">
+                                  <img 
+                                    src={documentBackPreview} 
+                                    alt="Document Back" 
+                                    className="w-full h-40 object-contain mb-2"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    className="absolute top-0 right-0"
+                                    onClick={() => {
+                                      setDocumentBackPreview(null);
+                                      setDocumentBackFile(null);
+                                    }}
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <>
+                                  <Upload className="w-10 h-10 text-gray-400 mb-2" />
+                                  <p className="text-sm text-gray-500 mb-1">Click to upload or drag and drop</p>
+                                  <p className="text-xs text-gray-400">PNG, JPG or PDF (max. 5MB)</p>
+                                  <Input
+                                    id="documentBack"
+                                    name="documentBack"
+                                    type="file"
+                                    accept="image/*,.pdf"
+                                    className="hidden"
+                                    onChange={handleDocumentBackChange}
+                                  />
+                                  <Button 
+                                    type="button" 
+                                    variant="outline" 
+                                    className="mt-2"
+                                    onClick={() => document.getElementById('documentBack')?.click()}
+                                  >
+                                    Select File
+                                  </Button>
+                                </>
+                              )}
+                            </div>
                           </div>
                           
+                          {/* Selfie Upload with Preview */}
                           <div className="space-y-2">
                             <label htmlFor="selfie" className="text-sm font-medium">Upload Selfie</label>
-                            <Input
-                              id="selfie"
-                              name="selfie"
-                              type="file"
-                              accept="image/*"
-                              required
-                            />
+                            <div className="flex flex-col items-center p-4 border-2 border-dashed rounded-md border-gray-300 hover:border-gray-400 transition-colors">
+                              {selfiePreview ? (
+                                <div className="relative w-full">
+                                  <img 
+                                    src={selfiePreview} 
+                                    alt="Selfie" 
+                                    className="w-full h-40 object-contain mb-2"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    className="absolute top-0 right-0"
+                                    onClick={() => {
+                                      setSelfiePreview(null);
+                                      setSelfieFile(null);
+                                    }}
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <>
+                                  <Camera className="w-10 h-10 text-gray-400 mb-2" />
+                                  <p className="text-sm text-gray-500 mb-1">Take a clear selfie or upload one</p>
+                                  <p className="text-xs text-gray-400">Make sure your face is clearly visible</p>
+                                  <Input
+                                    id="selfie"
+                                    name="selfie"
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handleSelfieChange}
+                                  />
+                                  <div className="flex gap-2 mt-2">
+                                    <Button 
+                                      type="button" 
+                                      variant="outline"
+                                      onClick={() => document.getElementById('selfie')?.click()}
+                                    >
+                                      Upload
+                                    </Button>
+                                    <Button 
+                                      type="button"
+                                      onClick={() => {
+                                        // This would open the camera in a real implementation
+                                        toast({
+                                          title: "Camera access",
+                                          description: "Camera access would be requested here in a real implementation",
+                                        });
+                                      }}
+                                    >
+                                      Take Photo
+                                    </Button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
                           </div>
                           
                           <div className="flex items-start space-x-2 mt-4">
@@ -2791,7 +3400,7 @@ export default function Dashboard() {
               onClick={() => setActiveSection("transactions")}
             >
               <Clock className={`h-5 w-5 ${activeSection === "transactions" ? "" : "text-muted-foreground"}`} />
-              <span className={`text-xs mt-1 ${activeSection === "transactions" ? "" : "text-muted-foreground"}`}>History</span>
+              <span className={`text-xs mt-1 ${activeSection === "transactions" ? ""  : "text-muted-foreground"}`}>History</span>
             </Button>
             <Button 
               variant={activeSection === "profile" ? "default" : "ghost"} 
