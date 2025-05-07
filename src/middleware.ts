@@ -12,22 +12,44 @@ const AUTH_RATE_LIMIT_WINDOW = 5 * 60 * 1000; // 5 minutes for auth endpoints
 const AUTH_MAX_REQUESTS_PER_WINDOW = 10; // 10 auth requests per 5 minutes
 
 export function middleware(request: NextRequest) {
-  // Simply pass through all requests with minimal headers
   const response = NextResponse.next();
   
-  // Add only the most basic security header
+  // Get client IP and path
+  const ip = request.ip || 'unknown';
+  const path = request.nextUrl.pathname;
+  
+  // Add security headers
   response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-XSS-Protection', '1; mode=block');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  
+  // Determine if this is an auth endpoint
+  const isAuthEndpoint = path.includes('/api/auth') || 
+                         path === '/login' || 
+                         path === '/signup' || 
+                         path === '/forgot-password' || 
+                         path === '/reset-password';
+  
+  // Log API usage for monitoring
+  if (path.startsWith('/api/')) {
+    console.info(`API Request: ${request.method} ${path} from ${ip}`);
+  }
   
   return response;
 }
 
-// Configure middleware to only run on auth-related pages
-// This is a minimal configuration to avoid any potential issues
+// Configure middleware to run on important routes but not all routes
 export const config = {
   matcher: [
+    // Apply to auth pages
     '/login',
     '/signup',
     '/forgot-password',
     '/reset-password',
+    // Apply to important API routes
+    '/api/portfolio/:path*',
+    '/api/watchlist/:path*',
+    '/api/watchlists/:path*',
+    '/api/user/:path*',
   ],
 };
