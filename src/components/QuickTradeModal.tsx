@@ -302,6 +302,44 @@ export default function QuickTradeModal() {
   const executeTrade = async () => {
     if (!selectedStock) return;
     
+    // Validate inputs before executing trade
+    if (quantity <= 0 || !Number.isInteger(quantity)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Quantity",
+        description: "Quantity must be a positive integer",
+      });
+      return;
+    }
+    
+    if (orderType === 'LIMIT' && (!limitPrice || limitPrice <= 0)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Limit Price",
+        description: "Please enter a valid limit price",
+      });
+      return;
+    }
+    
+    if (orderType === 'STOP' && (!stopPrice || stopPrice <= 0)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Stop Price",
+        description: "Please enter a valid stop price",
+      });
+      return;
+    }
+    
+    // Check if user can execute trade
+    if (!canExecuteTrade()) {
+      toast({
+        variant: "destructive",
+        title: "Cannot Execute Trade",
+        description: getTradeErrorMessage() || "Unable to execute trade",
+      });
+      return;
+    }
+    
     try {
       setIsExecuting(true);
       
@@ -337,6 +375,9 @@ export default function QuickTradeModal() {
           title: `${tradeType === 'BUY' ? 'Purchase' : 'Sale'} Successful`,
           description: `${tradeType === 'BUY' ? 'Bought' : 'Sold'} ${quantity} shares of ${selectedStock.symbol} at ₹${selectedStock.currentPrice.toFixed(2)}`,
         });
+        
+        // Update user data after successful trade
+        fetchUserData();
       }
       else if (tradeMode === 'FUTURES' && selectedFuturesContract) {
         // Prepare futures order details
@@ -367,6 +408,10 @@ export default function QuickTradeModal() {
           title: `Futures ${tradeType === 'BUY' ? 'Purchase' : 'Sale'} Successful`,
           description: `${tradeType === 'BUY' ? 'Bought' : 'Sold'} ${quantity} lots of ${selectedStock.symbol} futures at ₹${selectedFuturesContract.contractPrice.toFixed(2)}`,
         });
+        
+        // Update user data and positions after successful trade
+        fetchUserData();
+        fetchFuturesPositions();
       }
       else if (tradeMode === 'OPTIONS' && selectedOptionsContract) {
         // Prepare options order details
@@ -397,6 +442,10 @@ export default function QuickTradeModal() {
           title: `Options ${tradeType === 'BUY' ? 'Purchase' : 'Sale'} Successful`,
           description: `${tradeType === 'BUY' ? 'Bought' : 'Sold'} ${quantity} lots of ${selectedStock.symbol} ${selectedOptionsContract.type} options at ₹${selectedOptionsContract.premiumPrice.toFixed(2)}`,
         });
+        
+        // Update user data and positions after successful trade
+        fetchUserData();
+        fetchOptionsPositions();
       }
       
       // Close the modal

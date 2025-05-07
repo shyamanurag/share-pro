@@ -1,10 +1,15 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
+import { createClient } from '@/util/supabase/api';
+import { 
+  roundCurrency, 
+  calculateFuturesMargin, 
+  calculateFuturesPnL,
+  hasSufficientBalance,
+  hasSufficientShares
+} from '@/lib/accounting';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Skip authentication for now to make the feature work
-  // In a production environment, proper authentication should be implemented
-
   // GET request to fetch futures contracts
   if (req.method === 'GET') {
     try {
@@ -82,12 +87,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const nextPremium = stock.currentPrice * 0.02;    // 2% premium
         const farPremium = stock.currentPrice * 0.03;     // 3% premium
 
+        // Calculate margin using accounting utility
+        const currentMargin = calculateFuturesMargin(
+          stock.currentPrice + currentPremium, 
+          50, 
+          0.2
+        );
+        
+        const nextMargin = calculateFuturesMargin(
+          stock.currentPrice + nextPremium, 
+          50, 
+          0.2
+        );
+        
+        const farMargin = calculateFuturesMargin(
+          stock.currentPrice + farPremium, 
+          50, 
+          0.2
+        );
+
         mockContracts.push({
           id: `future-${stock.id}-1`,
-          contractPrice: stock.currentPrice + currentPremium,
+          contractPrice: roundCurrency(stock.currentPrice + currentPremium),
           expiryDate: currentMonth,
           lotSize: 50,
-          marginRequired: (stock.currentPrice + currentPremium) * 50 * 0.2, // 20% margin
+          marginRequired: currentMargin,
           stock: {
             id: stock.id,
             symbol: stock.symbol,
@@ -98,10 +122,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         mockContracts.push({
           id: `future-${stock.id}-2`,
-          contractPrice: stock.currentPrice + nextPremium,
+          contractPrice: roundCurrency(stock.currentPrice + nextPremium),
           expiryDate: nextMonth,
           lotSize: 50,
-          marginRequired: (stock.currentPrice + nextPremium) * 50 * 0.2, // 20% margin
+          marginRequired: nextMargin,
           stock: {
             id: stock.id,
             symbol: stock.symbol,
@@ -112,10 +136,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         mockContracts.push({
           id: `future-${stock.id}-3`,
-          contractPrice: stock.currentPrice + farPremium,
+          contractPrice: roundCurrency(stock.currentPrice + farPremium),
           expiryDate: farMonth,
           lotSize: 50,
-          marginRequired: (stock.currentPrice + farPremium) * 50 * 0.2, // 20% margin
+          marginRequired: farMargin,
           stock: {
             id: stock.id,
             symbol: stock.symbol,
@@ -137,47 +161,212 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // POST request to execute a futures trade
   else if (req.method === 'POST') {
     try {
+      // Get user from auth
+      const supabase = createClient(req, res);
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      
       const { futuresContractId, quantity, type } = req.body;
 
       if (!futuresContractId) {
         return res.status(400).json({ error: 'Futures contract ID is required' });
       }
 
-      if (!quantity || quantity <= 0) {
-        return res.status(400).json({ error: 'Valid quantity is required' });
+      if (!quantity || quantity <= 0 || !Number.isInteger(quantity)) {
+        return res.status(400).json({ error: 'Valid quantity (positive integer) is required' });
       }
 
       if (!type || !['BUY', 'SELL'].includes(type)) {
         return res.status(400).json({ error: 'Valid order type (BUY/SELL) is required' });
       }
+      
+      // Get futures contract details
+      const futuresContract = await prisma.futuresContract.findUnique({
+        where: { id: futuresContractId },
+        include: { stock: true }
+      });
+      
+      if (!futuresContract) {
+        return res.status(404).json({ error: 'Futures contract not found' });
+      }
+      
+      // Get user's current balance
+      const userData = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { balance: true },
+      });
 
-      // For demo purposes, we'll use a mock user ID
-      const mockUserId = "demo-user-id";
-
-      // In a real app, we would check if the user has enough margin, execute the trade, etc.
-      // For this demo, we'll just simulate a successful trade
-
-      // Create a mock transaction record (commented out to avoid DB writes without auth)
-      /*
-      await prisma.transaction.create({
+      if (!userData) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      // Calculate required margin using accounting utility
+      const requiredMargin = roundCurrency(futuresContract.marginRequired * quantity);
+      
+      // Check if user has an existing position for this contract
+      const existingPosition = await prisma.futuresPosition.findFirst({
+        where: {
+          userId: user.id,
+          futuresContractId: futuresContractId
+        }
+      });
+      
+      // Process trade based on type
+      if (type === 'BUY') {
+        // Check if user has enough balance for margin using accounting utility
+        if (!hasSufficientBalance(userData.balance, requiredMargin)) {
+          return res.status(400).json({ error: 'Insufficient balance for margin requirement' });
+        }
+        
+        // Update user's balance (deduct margin)
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { balance: roundCurrency(userData.balance - requiredMargin) },
+        });
+        
+        // Create or update futures position
+        if (existingPosition) {
+          // Update existing position
+          const newQuantity = existingPosition.quantity + quantity;
+          const newEntryPrice = roundCurrency(
+            ((existingPosition.entryPrice * existingPosition.quantity) + 
+            (futuresContract.contractPrice * quantity)) / newQuantity
+          );
+          
+          await prisma.futuresPosition.update({
+            where: { id: existingPosition.id },
+            data: {
+              quantity: newQuantity,
+              entryPrice: newEntryPrice,
+              currentPrice: futuresContract.contractPrice,
+              margin: roundCurrency(existingPosition.margin + requiredMargin),
+              pnl: calculateFuturesPnL(
+                newEntryPrice, 
+                futuresContract.contractPrice, 
+                futuresContract.lotSize, 
+                newQuantity
+              ),
+              updatedAt: new Date()
+            }
+          });
+        } else {
+          // Create new position
+          await prisma.futuresPosition.create({
+            data: {
+              userId: user.id,
+              futuresContractId: futuresContractId,
+              quantity: quantity,
+              entryPrice: futuresContract.contractPrice,
+              currentPrice: futuresContract.contractPrice,
+              margin: requiredMargin,
+              pnl: 0, // No PnL at entry
+              createdAt: new Date(),
+              updatedAt: new Date()
+            }
+          });
+        }
+      } 
+      else if (type === 'SELL') {
+        // Check if user has the position to sell
+        if (!existingPosition) {
+          return res.status(400).json({ error: 'No existing futures position to sell' });
+        }
+        
+        // Check if user has enough quantity
+        if (!hasSufficientShares(existingPosition.quantity, quantity)) {
+          return res.status(400).json({ error: 'Not enough futures contracts to sell' });
+        }
+        
+        // Calculate PnL for the sold portion using accounting utility
+        const totalPnl = calculateFuturesPnL(
+          existingPosition.entryPrice, 
+          futuresContract.contractPrice, 
+          futuresContract.lotSize, 
+          quantity
+        );
+        
+        // Calculate margin to be released
+        const marginToRelease = roundCurrency((existingPosition.margin / existingPosition.quantity) * quantity);
+        
+        // Update user's balance (add margin + PnL)
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { balance: roundCurrency(userData.balance + marginToRelease + totalPnl) },
+        });
+        
+        // Update futures position
+        const newQuantity = existingPosition.quantity - quantity;
+        
+        if (newQuantity === 0) {
+          // Close position completely
+          await prisma.futuresPosition.delete({
+            where: { id: existingPosition.id }
+          });
+        } else {
+          // Reduce position size
+          await prisma.futuresPosition.update({
+            where: { id: existingPosition.id },
+            data: {
+              quantity: newQuantity,
+              margin: roundCurrency(existingPosition.margin - marginToRelease),
+              pnl: calculateFuturesPnL(
+                existingPosition.entryPrice, 
+                futuresContract.contractPrice, 
+                futuresContract.lotSize, 
+                newQuantity
+              ),
+              updatedAt: new Date()
+            }
+          });
+        }
+      }
+      
+      // Calculate total transaction value
+      const transactionTotal = type === 'BUY' 
+        ? requiredMargin 
+        : roundCurrency(futuresContract.contractPrice * futuresContract.lotSize * quantity);
+      
+      // Create transaction record
+      const transaction = await prisma.transaction.create({
         data: {
-          userId: mockUserId,
+          userId: user.id,
+          stockId: futuresContract.stockId,
           type: type === 'BUY' ? 'BUY_FUTURES' : 'SELL_FUTURES',
-          quantity,
-          price: 0, // This would be the actual contract price
-          stockId: '', // This would be the actual stock ID
+          quantity: quantity,
+          price: futuresContract.contractPrice,
+          total: transactionTotal,
+          orderType: 'MARKET',
           status: 'COMPLETED',
-          metadata: {
-            futuresContractId,
-            orderType: type,
-          },
+        }
+      });
+      
+      // Log the transaction in system logs
+      await prisma.systemLog.create({
+        data: {
+          level: 'INFO',
+          source: 'FUTURES_TRADE',
+          message: `User ${user.id} ${type === 'BUY' ? 'bought' : 'sold'} ${quantity} lots of ${futuresContract.stock.symbol} futures at ₹${futuresContract.contractPrice}`,
+          details: JSON.stringify({
+            userId: user.id,
+            futuresContractId: futuresContractId,
+            stockId: futuresContract.stockId,
+            type: type,
+            quantity: quantity,
+            price: futuresContract.contractPrice,
+            margin: requiredMargin,
+            pnl: type === 'SELL' ? totalPnl : 0,
+            timestamp: new Date(),
+          }),
         },
       });
-      */
 
       return res.status(200).json({
         success: true,
         message: `Successfully ${type === 'BUY' ? 'bought' : 'sold'} ${quantity} lots of futures contract`,
+        transaction: transaction
       });
     } catch (error) {
       console.error('Error executing futures trade:', error);

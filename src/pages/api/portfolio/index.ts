@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { withAuth, logApiUsage } from '@/lib/api-auth';
+import { calculatePortfolioValue } from '@/lib/accounting';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Record start time for performance monitoring
@@ -61,10 +62,8 @@ const authenticatedHandler = withAuth(async (req: NextApiRequest, res: NextApiRe
           select: { balance: true },
         });
 
-        // Calculate portfolio value
-        const portfolioValue = portfolioItems.reduce((total, item) => {
-          return total + (item.quantity * item.stock.currentPrice);
-        }, 0);
+        // Calculate portfolio value using accounting utility
+        const portfolioValue = calculatePortfolioValue(portfolioItems);
 
         // Log successful API usage
         await logApiUsage(req, res, userId, startTime);

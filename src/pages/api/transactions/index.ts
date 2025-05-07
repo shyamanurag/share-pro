@@ -1,6 +1,14 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { createClient } from '@/util/supabase/api';
+import { 
+  roundCurrency, 
+  calculateTransactionTotal, 
+  calculateNewAverageBuyPrice,
+  validateTransactionInput,
+  hasSufficientBalance,
+  hasSufficientShares
+} from '@/lib/accounting';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -26,16 +34,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     else if (req.method === 'POST') {
       const { stockId, type, quantity } = req.body;
       
-      if (!stockId || !type || !quantity) {
-        return res.status(400).json({ error: 'Stock ID, type, and quantity are required' });
-      }
-
-      if (type !== 'BUY' && type !== 'SELL') {
-        return res.status(400).json({ error: 'Type must be BUY or SELL' });
-      }
-
-      if (quantity <= 0 || !Number.isInteger(quantity)) {
-        return res.status(400).json({ error: 'Quantity must be a positive integer' });
+      // Validate transaction input
+      const validationError = validateTransactionInput(stockId, type, quantity);
+      if (validationError) {
+        return res.status(400).json({ error: validationError });
       }
 
       // Get stock details
@@ -57,8 +59,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(404).json({ error: 'User not found' });
       }
 
-      // Calculate transaction total
-      const total = stock.currentPrice * quantity;
+      // Calculate transaction total using accounting utility
+      const total = calculateTransactionTotal(stock.currentPrice, quantity);
 
       // Find or create user's portfolio
       let portfolio = await prisma.portfolio.findFirst({
@@ -76,8 +78,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Process transaction based on type
       if (type === 'BUY') {
-        // Check if user has enough balance
-        if (userData.balance < total) {
+        // Check if user has enough balance using accounting utility
+        if (!hasSufficientBalance(userData.balance, total)) {
           return res.status(400).json({ error: 'Insufficient balance' });
         }
 
@@ -96,9 +98,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
 
         if (existingItem) {
-          // Update existing portfolio item
+          // Update existing portfolio item using accounting utility
           const newQuantity = existingItem.quantity + quantity;
-          const newAvgBuyPrice = ((existingItem.avgBuyPrice * existingItem.quantity) + total) / newQuantity;
+          const newAvgBuyPrice = calculateNewAverageBuyPrice(
+            existingItem.avgBuyPrice, 
+            existingItem.quantity, 
+            stock.currentPrice, 
+            quantity
+          );
           
           await prisma.portfolioItem.update({
             where: { id: existingItem.id },
@@ -132,8 +139,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return res.status(400).json({ error: 'Stock not in portfolio' });
         }
 
-        // Check if user has enough shares
-        if (portfolioItem.quantity < quantity) {
+        // Check if user has enough shares using accounting utility
+        if (!hasSufficientShares(portfolioItem.quantity, quantity)) {
           return res.status(400).json({ error: 'Not enough shares to sell' });
         }
 
@@ -160,7 +167,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
 
-      // Create transaction record
+      // Create transaction record with proper order type
       const transaction = await prisma.transaction.create({
         data: {
           userId: user.id,
@@ -169,8 +176,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           quantity: quantity,
           price: stock.currentPrice,
           total: total,
+          orderType: 'MARKET', // Default to MARKET order type
+          status: 'COMPLETED',
         },
         include: { stock: true },
+      });
+
+      // Log the transaction in system logs for audit purposes
+      await prisma.systemLog.create({
+        data: {
+          level: 'INFO',
+          source: 'TRANSACTION',
+          message: `User ${user.id} ${type === 'BUY' ? 'bought' : 'sold'} ${quantity} shares of ${stock.symbol} at ₹${stock.currentPrice}`,
+          details: JSON.stringify({
+            userId: user.id,
+            stockId: stockId,
+            type: type,
+            quantity: quantity,
+            price: stock.currentPrice,
+            total: total,
+            timestamp: new Date(),
+          }),
+        },
       });
 
       return res.status(201).json({ transaction });
