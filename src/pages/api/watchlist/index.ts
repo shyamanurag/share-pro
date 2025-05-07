@@ -1,11 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
-import { withAuth, logApiUsage } from '@/lib/api-auth';
+import { withAuth } from '@/lib/api-auth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Record start time for performance monitoring
-  const startTime = Date.now();
-  
   try {
     // This handler will be wrapped with authentication
     return await authenticatedHandler(req, res);
@@ -15,9 +12,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       error: 'Internal Server Error',
       message: 'An unexpected error occurred while processing your request'
     });
-    
-    // Log API usage with error
-    await logApiUsage(req, res, undefined, startTime);
     return;
   }
 }
@@ -41,12 +35,10 @@ const authenticatedHandler = withAuth(async (req: NextApiRequest, res: NextApiRe
       });
       
       if (!watchlist) {
-        res.status(404).json({ 
+        return res.status(404).json({ 
           error: 'Not Found',
           message: 'Watchlist not found or you do not have access to it'
         });
-        await logApiUsage(req, res, userId, startTime);
-        return;
       }
     } else {
       // Get or create default watchlist
@@ -77,9 +69,6 @@ const authenticatedHandler = withAuth(async (req: NextApiRequest, res: NextApiRe
       orderBy: { updatedAt: 'desc' },
     });
 
-    // Log successful API usage
-    await logApiUsage(req, res, userId, startTime);
-
     return res.status(200).json({ 
       watchlist,
       items: watchlistItems,
@@ -92,12 +81,10 @@ const authenticatedHandler = withAuth(async (req: NextApiRequest, res: NextApiRe
     const { stockId, watchlistId } = req.body;
     
     if (!stockId) {
-      res.status(400).json({ 
+      return res.status(400).json({ 
         error: 'Bad Request',
         message: 'Stock ID is required'
       });
-      await logApiUsage(req, res, userId, startTime);
-      return;
     }
     
     // Validate that the stock exists
@@ -107,12 +94,10 @@ const authenticatedHandler = withAuth(async (req: NextApiRequest, res: NextApiRe
     });
     
     if (!stockExists) {
-      res.status(404).json({ 
+      return res.status(404).json({ 
         error: 'Not Found',
         message: 'The specified stock does not exist'
       });
-      await logApiUsage(req, res, userId, startTime);
-      return;
     }
 
     // Find specified watchlist or default watchlist
@@ -127,12 +112,10 @@ const authenticatedHandler = withAuth(async (req: NextApiRequest, res: NextApiRe
       });
       
       if (!watchlist) {
-        res.status(404).json({ 
+        return res.status(404).json({ 
           error: 'Not Found',
           message: 'Watchlist not found or you do not have access to it'
         });
-        await logApiUsage(req, res, userId, startTime);
-        return;
       }
     } else {
       // Find or create default watchlist
@@ -160,12 +143,10 @@ const authenticatedHandler = withAuth(async (req: NextApiRequest, res: NextApiRe
     });
 
     if (existingItem) {
-      res.status(400).json({ 
+      return res.status(400).json({ 
         error: 'Bad Request',
         message: 'Stock already in this watchlist'
       });
-      await logApiUsage(req, res, userId, startTime);
-      return;
     }
 
     // Add stock to watchlist
@@ -183,20 +164,13 @@ const authenticatedHandler = withAuth(async (req: NextApiRequest, res: NextApiRe
       data: { updatedAt: new Date() },
     });
 
-    // Log successful API usage
-    await logApiUsage(req, res, userId, startTime);
-
     return res.status(201).json({ watchlistItem });
   }
   
   else {
-    res.status(405).json({ 
+    return res.status(405).json({ 
       error: 'Method Not Allowed',
       message: 'This endpoint only supports GET and POST requests'
     });
-    
-    // Log API usage with method not allowed
-    await logApiUsage(req, res, userId, startTime);
-    return;
   }
 });
