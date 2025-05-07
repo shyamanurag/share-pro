@@ -26,11 +26,12 @@ import {
   Clock,
   AlertTriangle,
   Check,
-  X
+  X,
+  Share2
 } from 'lucide-react';
 
 export default function QuickTradeModal() {
-  const { isQuickTradeModalOpen, selectedStock, initialTradeType, closeQuickTradeModal } = useTrade();
+  const { isQuickTradeModalOpen, selectedStock, initialTradeType, closeQuickTradeModal, openShareModal } = useTrade();
   const { user } = useAuth();
   
   const [tradeType, setTradeType] = useState<'BUY' | 'SELL'>('BUY');
@@ -595,29 +596,43 @@ export default function QuickTradeModal() {
                     </Tabs>
                   </div>
 
-                  <DialogFooter className="mt-6 flex gap-2">
+                  <DialogFooter className="mt-6 flex flex-col gap-2">
+                    <div className="flex gap-2 w-full">
+                      <Button 
+                        variant="outline" 
+                        onClick={closeQuickTradeModal}
+                        className="flex-1"
+                      >
+                        <X className="w-4 h-4 mr-2" /> Cancel
+                      </Button>
+                      <Button 
+                        onClick={executeTrade}
+                        disabled={!canExecuteTrade() || isExecuting}
+                        className={`flex-1 ${tradeType === 'BUY' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'}`}
+                      >
+                        {isExecuting ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Processing...
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-4 h-4 mr-2" /> 
+                            Confirm {tradeType === 'BUY' ? 'Purchase' : 'Sale'}
+                          </>
+                        )}
+                      </Button>
+                    </div>
                     <Button 
-                      variant="outline" 
-                      onClick={closeQuickTradeModal}
-                      className="flex-1"
+                      variant="secondary" 
+                      className="w-full"
+                      onClick={() => {
+                        closeQuickTradeModal();
+                        if (selectedStock) {
+                          openShareModal(selectedStock);
+                        }
+                      }}
                     >
-                      <X className="w-4 h-4 mr-2" /> Cancel
-                    </Button>
-                    <Button 
-                      onClick={executeTrade}
-                      disabled={!canExecuteTrade() || isExecuting}
-                      className={`flex-1 ${tradeType === 'BUY' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'}`}
-                    >
-                      {isExecuting ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Processing...
-                        </>
-                      ) : (
-                        <>
-                          <Check className="w-4 h-4 mr-2" /> 
-                          Confirm {tradeType === 'BUY' ? 'Purchase' : 'Sale'}
-                        </>
-                      )}
+                      <Share2 className="w-4 h-4 mr-2" /> Share Stock
                     </Button>
                   </DialogFooter>
                 </div>

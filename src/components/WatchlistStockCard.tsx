@@ -12,8 +12,10 @@ import {
   ArrowUpRight,
   ChevronDown,
   ChevronUp,
-  BarChart2
+  BarChart2,
+  Share2
 } from 'lucide-react';
+import { useTrade } from '@/contexts/TradeContext';
 import StockSymbolWrapper from './StockSymbolWrapper';
 import { Stock } from '@/types/trading';
 
@@ -36,6 +38,7 @@ export default function WatchlistStockCard({
   toggleWatchlist, 
   openTradeDialog 
 }: WatchlistStockCardProps) {
+  const { openShareModal } = useTrade();
   const [expanded, setExpanded] = useState(false);
   
   // Simulate additional stock data that's not in our model
@@ -138,26 +141,39 @@ export default function WatchlistStockCard({
               </div>
             </div>
             
-            <div className="flex justify-between mt-3">
-              <Button 
+            <div className="space-y-2 mt-3">
+              <div className="flex justify-between">
+                <Button 
+                  size="sm"
+                  className="w-[48%] bg-green-500 hover:bg-green-600 text-white"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openTradeDialog(item.stock, 'BUY');
+                  }}
+                >
+                  <ShoppingCart className="w-3 h-3 mr-1" /> Buy
+                </Button>
+                <Button 
+                  size="sm"
+                  className="w-[48%] bg-red-500 hover:bg-red-600 text-white"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openTradeDialog(item.stock, 'SELL');
+                  }}
+                >
+                  <ArrowUpRight className="w-3 h-3 mr-1" /> Sell
+                </Button>
+              </div>
+              <Button
                 size="sm"
-                className="w-[48%] bg-green-500 hover:bg-green-600 text-white"
+                variant="outline"
+                className="w-full"
                 onClick={(e) => {
                   e.stopPropagation();
-                  openTradeDialog(item.stock, 'BUY');
+                  openShareModal(item.stock);
                 }}
               >
-                <ShoppingCart className="w-3 h-3 mr-1" /> Buy
-              </Button>
-              <Button 
-                size="sm"
-                className="w-[48%] bg-red-500 hover:bg-red-600 text-white"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openTradeDialog(item.stock, 'SELL');
-                }}
-              >
-                <ArrowUpRight className="w-3 h-3 mr-1" /> Sell
+                <Share2 className="w-3 h-3 mr-1" /> Share
               </Button>
             </div>
           </div>

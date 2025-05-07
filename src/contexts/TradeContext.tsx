@@ -7,12 +7,16 @@ interface TradeContextType {
   initialTradeType: 'BUY' | 'SELL';
   openQuickTradeModal: (stock: Stock, tradeType?: 'BUY' | 'SELL') => void;
   closeQuickTradeModal: () => void;
+  isShareModalOpen: boolean;
+  openShareModal: (stock: Stock) => void;
+  closeShareModal: () => void;
 }
 
 const TradeContext = createContext<TradeContextType | undefined>(undefined);
 
 export function TradeProvider({ children }: { children: React.ReactNode }) {
   const [isQuickTradeModalOpen, setIsQuickTradeModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   const [initialTradeType, setInitialTradeType] = useState<'BUY' | 'SELL'>('BUY');
 
@@ -29,6 +33,19 @@ export function TradeProvider({ children }: { children: React.ReactNode }) {
       setSelectedStock(null);
     }, 300);
   };
+  
+  const openShareModal = (stock: Stock) => {
+    setSelectedStock(stock);
+    setIsShareModalOpen(true);
+  };
+  
+  const closeShareModal = () => {
+    setIsShareModalOpen(false);
+    // Reset after animation completes
+    setTimeout(() => {
+      setSelectedStock(null);
+    }, 300);
+  };
 
   return (
     <TradeContext.Provider
@@ -37,7 +54,10 @@ export function TradeProvider({ children }: { children: React.ReactNode }) {
         selectedStock,
         initialTradeType,
         openQuickTradeModal,
-        closeQuickTradeModal
+        closeQuickTradeModal,
+        isShareModalOpen,
+        openShareModal,
+        closeShareModal
       }}
     >
       {children}

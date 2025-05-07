@@ -9,8 +9,10 @@ import {
   TrendingDown, 
   Star,
   ShoppingCart,
-  ArrowUpRight
+  ArrowUpRight,
+  Share2
 } from 'lucide-react';
+import { useTrade } from '@/contexts/TradeContext';
 import StockSymbolWrapper from './StockSymbolWrapper';
 import { Stock } from '@/types/trading';
 
@@ -27,6 +29,7 @@ export default function StockCard({
   toggleWatchlist, 
   openTradeDialog 
 }: StockCardProps) {
+  const { openShareModal } = useTrade();
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -85,20 +88,30 @@ export default function StockCard({
               <div>Volume: {stock.volume.toLocaleString()}</div>
               <div>Market Cap: ₹{(stock.marketCap ? (stock.marketCap / 10000000).toFixed(2) : "N/A")} Cr</div>
             </div>
-            <div className="mt-3 flex justify-between">
-              <Button 
+            <div className="mt-3 space-y-2">
+              <div className="flex justify-between">
+                <Button 
+                  size="sm"
+                  className="w-[48%] bg-green-500 hover:bg-green-600 text-white"
+                  onClick={() => openTradeDialog(stock, 'BUY')}
+                >
+                  <ShoppingCart className="w-3 h-3 mr-1" /> Buy
+                </Button>
+                <Button 
+                  size="sm"
+                  className="w-[48%] bg-red-500 hover:bg-red-600 text-white"
+                  onClick={() => openTradeDialog(stock, 'SELL')}
+                >
+                  <ArrowUpRight className="w-3 h-3 mr-1" /> Sell
+                </Button>
+              </div>
+              <Button
                 size="sm"
-                className="w-[48%] bg-green-500 hover:bg-green-600 text-white"
-                onClick={() => openTradeDialog(stock, 'BUY')}
+                variant="outline"
+                className="w-full"
+                onClick={() => openShareModal(stock)}
               >
-                <ShoppingCart className="w-3 h-3 mr-1" /> Buy
-              </Button>
-              <Button 
-                size="sm"
-                className="w-[48%] bg-red-500 hover:bg-red-600 text-white"
-                onClick={() => openTradeDialog(stock, 'SELL')}
-              >
-                <ArrowUpRight className="w-3 h-3 mr-1" /> Sell
+                <Share2 className="w-3 h-3 mr-1" /> Share
               </Button>
             </div>
           </div>
