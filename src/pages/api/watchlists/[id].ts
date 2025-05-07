@@ -1,33 +1,51 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
-import { createClient } from '@/util/supabase/api';
+import { withResourceOwner, logApiUsage } from '@/lib/api-auth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Record start time for performance monitoring
+  const startTime = Date.now();
+  
   try {
     const { id } = req.query;
     
     if (!id || typeof id !== 'string') {
-      return res.status(400).json({ error: 'Watchlist ID is required' });
+      return res.status(400).json({ 
+        error: 'Bad Request',
+        message: 'Watchlist ID is required'
+      });
     }
-
-    const supabase = createClient(req, res);
-    const { data: { user } } = await supabase.auth.getUser();
     
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    // Check if the watchlist belongs to the user
-    const watchlist = await prisma.watchlist.findUnique({
-      where: { id },
+    // This handler will be wrapped with resource ownership verification
+    return await resourceOwnerHandler(req, res);
+  } catch (error) {
+    console.error('Error in specific watchlist API:', error);
+    res.status(500).json({ 
+      error: 'Internal Server Error',
+      message: 'An unexpected error occurred while processing your request'
     });
+    
+    // Log API usage with error
+    await logApiUsage(req, res, undefined, startTime);
+    return;
+  }
+}
 
-    if (!watchlist) {
-      return res.status(404).json({ error: 'Watchlist not found' });
-    }
-
-    if (watchlist.userId !== user.id) {
-      return res.status(403).json({ error: 'You do not have permission to access this watchlist' });
+// Handler that requires resource ownership verification
+const resourceOwnerHandler = withResourceOwner(
+  'watchlist',
+  'id',
+  async (req: NextApiRequest, res: NextApiResponse, userId: string, isOwner: boolean) => {
+    const startTime = Date.now();
+    const { id } = req.query as { id: string };
+    
+    if (!isOwner) {
+      res.status(403).json({ 
+        error: 'Forbidden',
+        message: 'You do not have permission to access this watchlist'
+      });
+      await logApiUsage(req, res, userId, startTime);
+      return;
     }
 
     // PUT: Update watchlist name
@@ -35,7 +53,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { name } = req.body;
       
       if (!name || typeof name !== 'string') {
-        return res.status(400).json({ error: 'Watchlist name is required' });
+        res.status(400).json({ 
+          error: 'Bad Request',
+          message: 'Watchlist name is required'
+        });
+        await logApiUsage(req, res, userId, startTime);
+        return;
+      }
+      
+      // Validate name length and format
+      if (name.trim().length < 1 || name.length > 50) {
+        res.status(400).json({ 
+          error: 'Bad Request',
+          message: 'Watchlist name must be between 1 and 50 characters'
+        });
+        await logApiUsage(req, res, userId, startTime);
+        return;
+      }
+      
+      // Check if user already has another watchlist with this name
+      const existingWatchlist = await prisma.watchlist.findFirst({
+        where: {
+          userId,
+          name: {
+            equals: name,
+            mode: 'insensitive' // Case-insensitive comparison
+          },
+          id: {
+            not: id // Exclude the current watchlist
+          }
+        }
+      });
+      
+      if (existingWatchlist) {
+        res.status(400).json({ 
+          error: 'Bad Request',
+          message: 'You already have another watchlist with this name'
+        });
+        await logApiUsage(req, res, userId, startTime);
+        return;
       }
 
       const updatedWatchlist = await prisma.watchlist.update({
@@ -43,20 +99,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         data: { name },
       });
 
-      return res.status(200).json({ watchlist: updatedWatchlist });
+      // Log successful API usage
+      await logApiUsage(req, res, userId, startTime);
+
+      return res.status(200).json({ 
+        watchlist: updatedWatchlist,
+        message: 'Watchlist updated successfully'
+      });
     }
     
     // DELETE: Delete watchlist
     else if (req.method === 'DELETE') {
       // First check if this is the user's only watchlist
       const watchlistCount = await prisma.watchlist.count({
-        where: { userId: user.id },
+        where: { userId },
       });
 
       if (watchlistCount <= 1) {
-        return res.status(400).json({ 
-          error: 'Cannot delete the only watchlist. Create a new watchlist first.' 
+        res.status(400).json({ 
+          error: 'Bad Request',
+          message: 'Cannot delete the only watchlist. Create a new watchlist first.'
         });
+        await logApiUsage(req, res, userId, startTime);
+        return;
       }
 
       // Delete the watchlist (cascade will delete all items)
@@ -66,20 +131,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Find another watchlist to set as active
       const anotherWatchlist = await prisma.watchlist.findFirst({
-        where: { userId: user.id },
+        where: { userId },
       });
 
+      // Log successful API usage
+      await logApiUsage(req, res, userId, startTime);
+
       return res.status(200).json({ 
+        success: true,
         message: 'Watchlist deleted successfully',
         nextActiveWatchlist: anotherWatchlist
       });
     }
     
     else {
-      return res.status(405).json({ error: 'Method not allowed' });
+      res.status(405).json({ 
+        error: 'Method Not Allowed',
+        message: 'This endpoint only supports PUT and DELETE requests'
+      });
+      
+      // Log API usage with method not allowed
+      await logApiUsage(req, res, userId, startTime);
+      return;
     }
-  } catch (error) {
-    console.error('Error managing watchlist:', error);
-    return res.status(500).json({ error: 'Failed to manage watchlist' });
   }
-}
+);

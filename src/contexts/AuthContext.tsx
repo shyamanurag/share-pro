@@ -70,26 +70,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .single();
 
       if (error) {
-        console.error('Error fetching user profile:', error);
+        // Log error but don't expose details to console
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to fetch user profile",
+        });
         return;
       }
 
       setUserProfile(data);
       
-      // Check if user is admin
-      const isAdminUser = 
-        data?.role === 'ADMIN' || 
-        user.email?.includes('admin') || 
-        user.email === 'demo@papertrader.app' ||
-        user.user_metadata?.role === 'ADMIN';
-      
+      // Check if user is admin - ONLY use the role from database
+      // Do not use email or metadata for admin determination
+      const isAdminUser = data?.role === 'ADMIN';
       setIsAdmin(isAdminUser);
-      
-      if (isAdminUser) {
-        localStorage.setItem('adminUser', 'true');
-      }
     } catch (error) {
-      console.error('Error in refreshUserProfile:', error);
+      // Silent error handling to avoid leaking info
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to refresh user profile",
+      });
     }
   };
 
@@ -165,38 +167,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signIn = async (email: string, password: string) => {
     // Clear any existing auth state first
     if (typeof window !== 'undefined') {
-      console.log('Clearing auth state before sign in');
       localStorage.clear();
       sessionStorage.clear();
       
       // Clear service worker registrations and caches
       if ('serviceWorker' in navigator) {
-        console.log('Unregistering service workers');
         const registrations = await navigator.serviceWorker.getRegistrations();
         for (const registration of registrations) {
           await registration.unregister();
         }
         
         if ('caches' in window) {
-          console.log('Clearing caches');
           const cacheKeys = await caches.keys();
           await Promise.all(cacheKeys.map(key => caches.delete(key)));
         }
       }
     }
     
-    console.log(`Attempting to sign in with email: ${email}`);
-    
     // First sign out to ensure a clean state
     try {
       await supabase.auth.signOut();
-      console.log('Successfully signed out before new sign in');
       
       // Wait a moment to ensure signout is complete
       await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (signOutError) {
-      console.error('Error during pre-signin signout:', signOutError);
-      // Continue anyway
+      // Continue anyway, but don't log the error
     }
     
     // Create a fresh Supabase client to avoid any cached state
@@ -205,7 +200,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // If this is the demo user, ensure it exists first
     if (email === 'demo@papertrader.app') {
       try {
-        console.log('Creating/verifying demo user before login');
         const timestamp = new Date().getTime(); // Add timestamp to prevent caching
         const response = await fetch(`/api/demo/create-demo-user?t=${timestamp}`, {
           method: 'POST',
@@ -217,44 +211,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         });
         
         const data = await response.json();
-        console.log('Demo user setup response:', data);
         
         if (!response.ok) {
           throw new Error(data.error || 'Failed to set up demo user');
         }
       } catch (demoError) {
-        console.error('Error setting up demo user:', demoError);
         throw new Error('Failed to set up demo user: ' + (demoError instanceof Error ? demoError.message : 'Unknown error'));
       }
     } 
-    // If this is the admin user, ensure it exists first
-    else if (email === 'admin@papertrader.app') {
-      try {
-        console.log('Creating/verifying admin user before login');
-        const timestamp = new Date().getTime(); // Add timestamp to prevent caching
-        const response = await fetch(`/api/demo/create-admin-user?t=${timestamp}`, {
-          method: 'POST',
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-          },
-        });
-        
-        const data = await response.json();
-        console.log('Admin user setup response:', data);
-        
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to set up admin user');
-        }
-      } catch (adminError) {
-        console.error('Error setting up admin user:', adminError);
-        throw new Error('Failed to set up admin user: ' + (adminError instanceof Error ? adminError.message : 'Unknown error'));
-      }
-    }
     
     // Now attempt to sign in with the fresh client
-    console.log('Calling supabase.auth.signInWithPassword');
     let signInAttempts = 0;
     const maxAttempts = 3;
     let lastError = null;
@@ -262,7 +228,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     while (signInAttempts < maxAttempts) {
       try {
         signInAttempts++;
-        console.log(`Sign in attempt ${signInAttempts} of ${maxAttempts}`);
         
         // Use a completely fresh client for each attempt
         const attemptSupabase = createClient();
@@ -273,7 +238,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         });
         
         if (error) {
-          console.error(`Sign in error (attempt ${signInAttempts}):`, error);
           lastError = error;
           
           // Wait before retrying
@@ -282,33 +246,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         } 
         
         if (data.user) {
-          console.log('Sign in successful, user data:', data.user);
-          
-          // For admin or demo users, ensure they have the admin role
-          if (email.includes('admin') || email === 'demo@papertrader.app') {
-            console.log('Admin/demo user detected, updating metadata');
-            // Always update user metadata to include admin role
-            try {
-              await attemptSupabase.auth.updateUser({
-                data: { role: 'ADMIN' }
-              });
-              console.log('Admin role set in user metadata');
-              
-              // Set admin flags in storage
-              localStorage.setItem('adminUser', 'true');
-              sessionStorage.setItem('adminUser', 'true');
-              sessionStorage.setItem('adminLoginAttempt', 'true');
-              sessionStorage.setItem('adminLoginTime', Date.now().toString());
-            } catch (updateError) {
-              console.error('Error updating user metadata:', updateError);
-              // Continue anyway
-            }
-          }
-          
-          console.log('Creating/updating user profile');
+          // Create or update user profile
           await createUser(data.user);
           
-          // Refresh the user data after metadata update
+          // Refresh the user data after profile creation
           const { data: refreshedData } = await attemptSupabase.auth.getUser();
           
           toast({
@@ -319,7 +260,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           // Return the refreshed user data
           return refreshedData?.user || data.user;
         } else {
-          console.error('Sign in returned no user data');
           lastError = new Error("No user data returned from authentication");
           
           // Wait before retrying
@@ -327,7 +267,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           continue;
         }
       } catch (unexpectedError) {
-        console.error(`Unexpected error during sign in (attempt ${signInAttempts}):`, unexpectedError);
         lastError = unexpectedError;
         
         // Wait before retrying
@@ -336,7 +275,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     
     // If we get here, all attempts failed
-    console.error('All sign in attempts failed');
     toast({
       variant: "destructive",
       title: "Error",
@@ -425,6 +363,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         description: error.message,
       });
     } else {
+      // Clear any stored data
+      if (typeof window !== 'undefined') {
+        localStorage.clear();
+        sessionStorage.clear();
+      }
+      
       toast({
         title: "Success",
         description: "You have successfully signed out",
