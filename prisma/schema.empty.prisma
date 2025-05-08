@@ -1,0 +1,14 @@
+// This is an empty schema file used during the build process
+// It contains only the generator and datasource definitions
+// No models are defined to avoid any schema migrations
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
