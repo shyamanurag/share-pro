@@ -104,13 +104,13 @@ export default function StockCard({
               <div>Volume: {stock.volume.toLocaleString()}</div>
               <div>Market Cap: ₹{(stock.marketCap ? (stock.marketCap / 10000000).toFixed(2) : "N/A")} Cr</div>
             </div>
-            <div className="mt-3 space-y-2">
-              <div className="flex justify-between">
+            <div className="mt-3">
+              <div className="flex gap-2">
                 <QuickTradeButton 
                   stock={stock}
                   variant="default"
                   size="sm"
-                  className="w-[48%] bg-green-500 hover:bg-green-600 text-white"
+                  className="flex-1 bg-green-500 hover:bg-green-600 text-white"
                   defaultTradeType="BUY"
                   showQuickOptions={false}
                 />
@@ -118,19 +118,23 @@ export default function StockCard({
                   stock={stock}
                   variant="default"
                   size="sm"
-                  className="w-[48%] bg-red-500 hover:bg-red-600 text-white"
+                  className="flex-1 bg-red-500 hover:bg-red-600 text-white"
                   defaultTradeType="SELL"
                   showQuickOptions={false}
                 />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="px-2"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openShareModal(stock);
+                  }}
+                  title="Share"
+                >
+                  <Share2 className="w-4 h-4" />
+                </Button>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full"
-                onClick={() => openShareModal(stock)}
-              >
-                <Share2 className="w-3 h-3 mr-1" /> Share
-              </Button>
             </div>
           </div>
         </CardContent>

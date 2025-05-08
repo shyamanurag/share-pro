@@ -153,11 +153,17 @@ export default function ShareModal({ isOpen, onClose, stock }: ShareModalProps) 
                   </div>
                 </DialogHeader>
 
-                <div className="mt-6">
+                <div className="mt-4">
                   <Tabs defaultValue={activeTab} onValueChange={setActiveTab}>
-                    <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="link">Copy Link</TabsTrigger>
-                      <TabsTrigger value="social">Social Media</TabsTrigger>
+                    <TabsList className="grid w-full grid-cols-2 mb-2">
+                      <TabsTrigger value="link">
+                        <Link className="h-4 w-4 mr-2" />
+                        Copy Link
+                      </TabsTrigger>
+                      <TabsTrigger value="social">
+                        <Share2 className="h-4 w-4 mr-2" />
+                        Social Media
+                      </TabsTrigger>
                     </TabsList>
                     
                     <TabsContent value="link" className="mt-4 space-y-4">

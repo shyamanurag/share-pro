@@ -141,11 +141,11 @@ export default function WatchlistStockCard({
               </div>
             </div>
             
-            <div className="space-y-2 mt-3">
-              <div className="flex justify-between">
+            <div className="mt-3">
+              <div className="flex gap-2">
                 <Button 
                   size="sm"
-                  className="w-[48%] bg-green-500 hover:bg-green-600 text-white"
+                  className="flex-1 bg-green-500 hover:bg-green-600 text-white"
                   onClick={(e) => {
                     e.stopPropagation();
                     openTradeDialog(item.stock, 'BUY');
@@ -155,7 +155,7 @@ export default function WatchlistStockCard({
                 </Button>
                 <Button 
                   size="sm"
-                  className="w-[48%] bg-red-500 hover:bg-red-600 text-white"
+                  className="flex-1 bg-red-500 hover:bg-red-600 text-white"
                   onClick={(e) => {
                     e.stopPropagation();
                     openTradeDialog(item.stock, 'SELL');
@@ -163,18 +163,19 @@ export default function WatchlistStockCard({
                 >
                   <ArrowUpRight className="w-3 h-3 mr-1" /> Sell
                 </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="px-2"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openShareModal(item.stock);
+                  }}
+                  title="Share"
+                >
+                  <Share2 className="w-4 h-4" />
+                </Button>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openShareModal(item.stock);
-                }}
-              >
-                <Share2 className="w-3 h-3 mr-1" /> Share
-              </Button>
             </div>
           </div>
         )}

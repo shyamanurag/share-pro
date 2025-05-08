@@ -152,7 +152,7 @@ export default function QuickTradeButton({
               <span>Advanced Trade</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleShare}>
-              <Share2 className="h-4 w-4 mr-2" />
+              <Share2 className="h-4 w-4 mr-2 text-blue-500" />
               <span>Share</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
