@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Minimal schema with just the essential models
+// This is used to generate a client without triggering migrations
+
+model User {
+  id        String   @id
+  email     String   @unique
+  createdAt DateTime @default(now())
+  name      String?
+  avatarUrl String?
+  balance   Float    @default(10000)
+  role      String   @default("USER")
+  isActive  Boolean  @default(true)
+  lastLogin DateTime?
+}
+
+model Stock {
+  id          String   @id @default(uuid())
+  symbol      String   @unique
+  name        String
+  currentPrice Float    @default(0)
+  updatedAt   DateTime @default(now())
+}
+
+model SystemLog {
+  id        String   @id @default(uuid())
+  level     String
+  source    String
+  message   String
+  details   String?
+  timestamp DateTime @default(now())
+}
