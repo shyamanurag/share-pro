@@ -8,19 +8,19 @@ import {
   TrendingUp, 
   TrendingDown, 
   Star,
-  ShoppingCart,
-  ArrowUpRight,
   Share2
 } from 'lucide-react';
 import { useTrade } from '@/contexts/TradeContext';
-import StockSymbolWrapper from './StockSymbolWrapper';
 import { Stock } from '@/types/trading';
+import UniversalStockSymbol from './UniversalStockSymbol';
+import QuickTradeButton from './QuickTradeButton';
+import { useStockClickHandler } from '@/hooks/useStockClickHandler';
 
 interface StockCardProps {
   stock: Stock;
   isInWatchlist: boolean;
   toggleWatchlist: () => void;
-  openTradeDialog: (stock: Stock, type: 'BUY' | 'SELL') => void;
+  openTradeDialog?: (stock: Stock, type: 'BUY' | 'SELL') => void;
 }
 
 export default function StockCard({ 
@@ -30,6 +30,17 @@ export default function StockCard({
   openTradeDialog 
 }: StockCardProps) {
   const { openShareModal } = useTrade();
+  const { handleStockClick } = useStockClickHandler();
+  
+  // Use the provided openTradeDialog function or fall back to the universal handler
+  const handleTradeClick = (type: 'BUY' | 'SELL') => {
+    if (openTradeDialog) {
+      openTradeDialog(stock, type);
+    } else {
+      handleStockClick(stock, type);
+    }
+  };
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -41,9 +52,14 @@ export default function StockCard({
           <div className="flex justify-between items-start">
             <div>
               <div className="flex items-center space-x-2">
-                <StockSymbolWrapper stock={stock}>
-                  <h3 className="font-bold">{stock.symbol}</h3>
-                </StockSymbolWrapper>
+                <UniversalStockSymbol 
+                  stock={stock}
+                  showPrice={false}
+                  showChange={false}
+                  showBadge={false}
+                  className="font-bold"
+                  variant="compact"
+                />
                 <Badge variant="outline" className="text-xs">
                   {stock.sector}
                 </Badge>
@@ -90,20 +106,22 @@ export default function StockCard({
             </div>
             <div className="mt-3 space-y-2">
               <div className="flex justify-between">
-                <Button 
+                <QuickTradeButton 
+                  stock={stock}
+                  variant="default"
                   size="sm"
                   className="w-[48%] bg-green-500 hover:bg-green-600 text-white"
-                  onClick={() => openTradeDialog(stock, 'BUY')}
-                >
-                  <ShoppingCart className="w-3 h-3 mr-1" /> Buy
-                </Button>
-                <Button 
+                  defaultTradeType="BUY"
+                  showQuickOptions={false}
+                />
+                <QuickTradeButton 
+                  stock={stock}
+                  variant="default"
                   size="sm"
                   className="w-[48%] bg-red-500 hover:bg-red-600 text-white"
-                  onClick={() => openTradeDialog(stock, 'SELL')}
-                >
-                  <ArrowUpRight className="w-3 h-3 mr-1" /> Sell
-                </Button>
+                  defaultTradeType="SELL"
+                  showQuickOptions={false}
+                />
               </div>
               <Button
                 size="sm"
