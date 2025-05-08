@@ -8,8 +8,9 @@ datasource db {
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
+
 model User {
-  id                String   @id @db.Uuid
+  id                String   @id // Removed @db.Uuid to match existing database
   email             String   @unique
   createdAt         DateTime @default(now())
   name              String?
@@ -35,11 +36,11 @@ model Stock {
   id                String   @id @default(uuid())
   symbol            String   @unique
   name              String
-  currentPrice      Float
-  previousClose     Float
-  change            Float
-  changePercent     Float
-  volume            Int
+  currentPrice      Float    @default(0) // Added default to fix schema issue
+  previousClose     Float    @default(0) // Added default
+  change            Float    @default(0) // Added default to fix schema issue
+  changePercent     Float    @default(0) // Added default to fix schema issue
+  volume            Int      @default(0) // Added default
   marketCap         Float?
   sector            String?
   exchange          String   @default("NSE") // "NSE", "BSE"
@@ -58,7 +59,7 @@ model Stock {
 model Watchlist {
   id        String   @id @default(uuid())
   name      String
-  userId    String   @db.Uuid
+  userId    String   // Removed @db.Uuid to match existing database
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id])
@@ -79,7 +80,7 @@ model WatchlistItem {
 model Portfolio {
   id        String   @id @default(uuid())
   name      String
-  userId    String   @db.Uuid
+  userId    String   // Removed @db.Uuid to match existing database
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id])
@@ -88,10 +89,10 @@ model Portfolio {
 
 model PortfolioItem {
   id          String   @id @default(uuid())
-  portfolioId String
+  portfolioId String   @default("") // Added default to fix schema issue
   stockId     String
   quantity    Int
-  avgBuyPrice Float
+  avgBuyPrice Float    @default(0) // Added default to fix schema issue
   portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
   stock       Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
 
@@ -100,7 +101,7 @@ model PortfolioItem {
 
 model Transaction {
   id            String   @id @default(uuid())
-  userId        String   @db.Uuid
+  userId        String   // Removed @db.Uuid to match existing database
   stockId       String
   type          String   // "BUY" or "SELL"
   orderType     String   @default("MARKET") // "MARKET", "LIMIT", "STOP_LOSS", "STOP_LIMIT"
@@ -153,7 +154,7 @@ model OptionsContract {
 
 model FuturesPosition {
   id                String   @id @default(uuid())
-  userId            String   @db.Uuid
+  userId            String   // Removed @db.Uuid to match existing database
   user              User     @relation(fields: [userId], references: [id])
   futuresContractId String
   futuresContract   FuturesContract @relation(fields: [futuresContractId], references: [id])
@@ -170,7 +171,7 @@ model FuturesPosition {
 
 model OptionsPosition {
   id                String   @id @default(uuid())
-  userId            String   @db.Uuid
+  userId            String   // Removed @db.Uuid to match existing database
   user              User     @relation(fields: [userId], references: [id])
   optionsContractId String
   optionsContract   OptionsContract @relation(fields: [optionsContractId], references: [id])
@@ -187,7 +188,7 @@ model OptionsPosition {
 // Models for Risk Management
 model RiskProfile {
   id                String   @id @default(uuid())
-  userId            String   @db.Uuid @unique
+  userId            String   @unique // Removed @db.Uuid to match existing database
   user              User     @relation(fields: [userId], references: [id])
   maxPositionSize   Float?   // Maximum position size as percentage of portfolio
   maxDrawdown       Float?   // Maximum allowed drawdown percentage
@@ -201,7 +202,7 @@ model RiskProfile {
 // Models for Advanced Order Types
 model OrderAlert {
   id            String   @id @default(uuid())
-  userId        String   @db.Uuid
+  userId        String   // Removed @db.Uuid to match existing database
   user          User     @relation(fields: [userId], references: [id])
   stockId       String
   stock         Stock    @relation(fields: [stockId], references: [id])
@@ -214,7 +215,7 @@ model OrderAlert {
 
 model BracketOrder {
   id            String   @id @default(uuid())
-  userId        String   @db.Uuid
+  userId        String   // Removed @db.Uuid to match existing database
   user          User     @relation(fields: [userId], references: [id])
   stockId       String
   stock         Stock    @relation(fields: [stockId], references: [id])
@@ -240,7 +241,7 @@ model SystemLog {
 // KYC Verification Models
 model KycDetail {
   id              String    @id @default(uuid())
-  userId          String    @unique @db.Uuid
+  userId          String    @unique // Removed @db.Uuid to match existing database
   user            User      @relation(fields: [userId], references: [id])
   fullName        String
   dateOfBirth     DateTime
@@ -266,7 +267,7 @@ model KycDetail {
 // Payment Request Models
 model PaymentRequest {
   id              String    @id @default(uuid())
-  userId          String    @db.Uuid
+  userId          String    // Removed @db.Uuid to match existing database
   user            User      @relation(fields: [userId], references: [id])
   amount          Float
   paymentMethod   String    // "UPI", "CARD", "NETBANKING", etc.
@@ -283,7 +284,7 @@ model PaymentRequest {
 // User Login History
 model LoginHistory {
   id          String    @id @default(uuid())
-  userId      String    @db.Uuid
+  userId      String    // Removed @db.Uuid to match existing database
   user        User      @relation(fields: [userId], references: [id])
   ipAddress   String?
   userAgent   String?
@@ -313,7 +314,7 @@ model ApiUsage {
   id          String   @id @default(uuid())
   endpoint    String
   method      String   // "GET", "POST", "PUT", "DELETE"
-  userId      String?  @db.Uuid
+  userId      String?  // Removed @db.Uuid to match existing database
   statusCode  Int
   responseTime Int      // in milliseconds
   timestamp   DateTime @default(now())
@@ -348,7 +349,7 @@ model SystemSetting {
 
 model UserActivity {
   id          String   @id @default(uuid())
-  userId      String   @db.Uuid
+  userId      String   // Removed @db.Uuid to match existing database
   action      String   // "LOGIN", "LOGOUT", "TRADE", "WATCHLIST_UPDATE", etc.
   details     String?  @db.Text
   ipAddress   String?
@@ -369,7 +370,7 @@ model NotificationTemplate {
 
 model UserNotification {
   id          String   @id @default(uuid())
-  userId      String   @db.Uuid
+  userId      String   // Removed @db.Uuid to match existing database
   title       String
   message     String
   type        String   // "PRICE_ALERT", "ORDER_EXECUTED", "SYSTEM", etc.
