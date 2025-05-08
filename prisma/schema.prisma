@@ -1,6 +1,6 @@
-// This is an empty schema file used during the build process
-// It contains only the generator and datasource definitions
-// No models are defined to avoid any schema migrations
+// This is a minimal schema file used during the build process
+// It contains only the bare minimum needed to generate a client
+// without requiring any migrations
 
 generator client {
   provider = "prisma-client-js"
@@ -11,4 +11,27 @@ datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+}
+
+// Minimal model that matches an existing table in the database
+// This won't trigger migrations but will allow client generation
+model User {
+  id        String   @id
+  email     String   @unique
+  createdAt DateTime @default(now())
+  name      String?
+  avatarUrl String?
+  balance   Float    @default(10000)
+  role      String   @default("USER")
+  isActive  Boolean  @default(true)
+  lastLogin DateTime?
+}
+
+// Another minimal model to ensure client generation
+model Stock {
+  id           String   @id @default(uuid())
+  symbol       String   @unique
+  name         String
+  currentPrice Float    @default(0)
+  updatedAt    DateTime @default(now())
 }

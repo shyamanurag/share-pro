@@ -5,18 +5,20 @@
       "src": "package.json",
       "use": "@vercel/next",
       "config": {
-        "buildCommand": "node scripts/generate-client-only.js && next build"
+        "buildCommand": "prisma generate --schema=prisma/schema.prisma --no-engine && next build"
       }
     }
   ],
   "env": {
     "PRISMA_SKIP_MIGRATIONS": "true",
-    "PRISMA_SCHEMA_DISABLE_MIGRATIONS": "true"
+    "PRISMA_SCHEMA_DISABLE_MIGRATIONS": "true",
+    "PRISMA_CLIENT_NO_SCHEMA_PUSH": "true"
   },
   "build": {
     "env": {
       "PRISMA_SKIP_MIGRATIONS": "true",
-      "PRISMA_SCHEMA_DISABLE_MIGRATIONS": "true"
+      "PRISMA_SCHEMA_DISABLE_MIGRATIONS": "true",
+      "PRISMA_CLIENT_NO_SCHEMA_PUSH": "true"
     }
   }
 }
