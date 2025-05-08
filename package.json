@@ -10,9 +10,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "vercel-build": "prisma generate --schema=prisma/schema.empty.prisma && next build",
+    "vercel-build": "node scripts/generate-client-only.js && next build",
     "generate-icons": "node scripts/generate-pwa-icons.js",
-    "prisma:generate": "prisma generate",
+    "prisma:generate": "node scripts/generate-client-only.js",
     "prisma:check": "node prisma/direct-check.js"
   },
   "dependencies": {

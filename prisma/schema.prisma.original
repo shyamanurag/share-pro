@@ -1,0 +1,378 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+model User {
+  id                String   @id // Removed @db.Uuid to match existing database
+  email             String   @unique
+  createdAt         DateTime @default(now())
+  name              String?
+  avatarUrl         String?
+  balance           Float    @default(10000) // Default virtual money for paper trading
+  role              String   @default("USER") // "USER", "ADMIN"
+  isActive          Boolean  @default(true)
+  lastLogin         DateTime?
+  portfolios        Portfolio[]
+  watchlists        Watchlist[]
+  transactions      Transaction[]
+  futuresPositions  FuturesPosition[]
+  optionsPositions  OptionsPosition[]
+  riskProfile       RiskProfile?
+  orderAlerts       OrderAlert[]
+  bracketOrders     BracketOrder[]
+  kycDetails        KycDetail?
+  paymentRequests   PaymentRequest[]
+  loginHistory      LoginHistory[]
+}
+
+model Stock {
+  id                String   @id @default(uuid())
+  symbol            String   @unique
+  name              String
+  currentPrice      Float    @default(0) // Added default to fix schema issue
+  previousClose     Float    @default(0) // Added default
+  change            Float    @default(0) // Added default to fix schema issue
+  changePercent     Float    @default(0) // Added default to fix schema issue
+  volume            Int      @default(0) // Added default
+  marketCap         Float?
+  sector            String?
+  exchange          String   @default("NSE") // "NSE", "BSE"
+  isF_O_Available   Boolean  @default(false) // Whether F&O trading is available for this stock
+  lotSize           Int?     // Lot size for F&O trading
+  updatedAt         DateTime @default(now())
+  watchlistItems    WatchlistItem[]
+  portfolioItems    PortfolioItem[]
+  transactions      Transaction[]
+  futuresContracts  FuturesContract[]
+  optionsContracts  OptionsContract[]
+  orderAlerts       OrderAlert[]
+  bracketOrders     BracketOrder[]
+}
+
+model Watchlist {
+  id        String   @id @default(uuid())
+  name      String
+  userId    String   // Removed @db.Uuid to match existing database
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+  items     WatchlistItem[]
+}
+
+model WatchlistItem {
+  id          String   @id @default(uuid())
+  watchlistId String
+  stockId     String
+  addedAt     DateTime @default(now())
+  watchlist   Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+  stock       Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+
+  @@unique([watchlistId, stockId])
+}
+
+model Portfolio {
+  id        String   @id @default(uuid())
+  name      String
+  userId    String   // Removed @db.Uuid to match existing database
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+  items     PortfolioItem[]
+}
+
+model PortfolioItem {
+  id          String   @id @default(uuid())
+  portfolioId String   @default("") // Added default to fix schema issue
+  stockId     String
+  quantity    Int
+  avgBuyPrice Float    @default(0) // Added default to fix schema issue
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  stock       Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+
+  @@unique([portfolioId, stockId])
+}
+
+model Transaction {
+  id            String   @id @default(uuid())
+  userId        String   // Removed @db.Uuid to match existing database
+  stockId       String
+  type          String   // "BUY" or "SELL"
+  orderType     String   @default("MARKET") // "MARKET", "LIMIT", "STOP_LOSS", "STOP_LIMIT"
+  quantity      Int
+  price         Float
+  total         Float
+  status        String   @default("COMPLETED") // "PENDING", "COMPLETED", "CANCELLED", "EXPIRED"
+  limitPrice    Float?   // For LIMIT and STOP_LIMIT orders
+  stopPrice     Float?   // For STOP_LOSS and STOP_LIMIT orders
+  expiryDate    DateTime? // For GTC (Good Till Cancelled) orders
+  timestamp     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id])
+  stock         Stock    @relation(fields: [stockId], references: [id])
+}
+
+// Models for F&O Trading
+model FuturesContract {
+  id              String   @id @default(uuid())
+  stockId         String
+  stock           Stock    @relation(fields: [stockId], references: [id])
+  expiryDate      DateTime
+  lotSize         Int
+  contractPrice   Float
+  marginRequired  Float
+  openInterest    Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  futuresPositions FuturesPosition[]
+}
+
+model OptionsContract {
+  id              String   @id @default(uuid())
+  stockId         String
+  stock           Stock    @relation(fields: [stockId], references: [id])
+  type            String   // "CALL" or "PUT"
+  strikePrice     Float
+  expiryDate      DateTime
+  lotSize         Int
+  premiumPrice    Float
+  openInterest    Int
+  impliedVolatility Float
+  delta           Float?
+  gamma           Float?
+  theta           Float?
+  vega            Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  optionsPositions OptionsPosition[]
+}
+
+model FuturesPosition {
+  id                String   @id @default(uuid())
+  userId            String   // Removed @db.Uuid to match existing database
+  user              User     @relation(fields: [userId], references: [id])
+  futuresContractId String
+  futuresContract   FuturesContract @relation(fields: [futuresContractId], references: [id])
+  quantity          Int      // In lots
+  entryPrice        Float
+  currentPrice      Float
+  margin            Float
+  pnl               Float
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([userId, futuresContractId])
+}
+
+model OptionsPosition {
+  id                String   @id @default(uuid())
+  userId            String   // Removed @db.Uuid to match existing database
+  user              User     @relation(fields: [userId], references: [id])
+  optionsContractId String
+  optionsContract   OptionsContract @relation(fields: [optionsContractId], references: [id])
+  quantity          Int      // In lots
+  entryPrice        Float
+  currentPrice      Float
+  pnl               Float
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([userId, optionsContractId])
+}
+
+// Models for Risk Management
+model RiskProfile {
+  id                String   @id @default(uuid())
+  userId            String   @unique // Removed @db.Uuid to match existing database
+  user              User     @relation(fields: [userId], references: [id])
+  maxPositionSize   Float?   // Maximum position size as percentage of portfolio
+  maxDrawdown       Float?   // Maximum allowed drawdown percentage
+  riskPerTrade      Float?   // Risk percentage per trade
+  stopLossDefault   Float?   // Default stop loss percentage
+  takeProfitDefault Float?   // Default take profit percentage
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// Models for Advanced Order Types
+model OrderAlert {
+  id            String   @id @default(uuid())
+  userId        String   // Removed @db.Uuid to match existing database
+  user          User     @relation(fields: [userId], references: [id])
+  stockId       String
+  stock         Stock    @relation(fields: [stockId], references: [id])
+  type          String   // "PRICE_ABOVE", "PRICE_BELOW", "PERCENT_CHANGE"
+  targetValue   Float
+  triggered     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BracketOrder {
+  id            String   @id @default(uuid())
+  userId        String   // Removed @db.Uuid to match existing database
+  user          User     @relation(fields: [userId], references: [id])
+  stockId       String
+  stock         Stock    @relation(fields: [stockId], references: [id])
+  entryPrice    Float
+  quantity      Int
+  stopLoss      Float
+  takeProfit    Float
+  status        String   // "PENDING", "ACTIVE", "COMPLETED", "CANCELLED"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Models for Admin and System Monitoring
+model SystemLog {
+  id          String   @id @default(uuid())
+  level       String   // "INFO", "WARNING", "ERROR", "CRITICAL"
+  source      String   // Component that generated the log
+  message     String
+  details     String?  @db.Text
+  timestamp   DateTime @default(now())
+}
+
+// KYC Verification Models
+model KycDetail {
+  id              String    @id @default(uuid())
+  userId          String    @unique // Removed @db.Uuid to match existing database
+  user            User      @relation(fields: [userId], references: [id])
+  fullName        String
+  dateOfBirth     DateTime
+  panNumber       String?   // PAN Card for Indian users
+  aadharNumber    String?   // Aadhar number for Indian users
+  address         String
+  city            String
+  state           String
+  postalCode      String
+  country         String    @default("India")
+  documentType    String    // "AADHAR", "PAN", "PASSPORT", "DRIVING_LICENSE"
+  documentFront   String    // URL to document front image
+  documentBack    String?   // URL to document back image (if applicable)
+  selfie          String?   // URL to selfie image
+  status          String    @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
+  rejectionReason String?
+  verifiedBy      String?   // Admin user ID who verified
+  verifiedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// Payment Request Models
+model PaymentRequest {
+  id              String    @id @default(uuid())
+  userId          String    // Removed @db.Uuid to match existing database
+  user            User      @relation(fields: [userId], references: [id])
+  amount          Float
+  paymentMethod   String    // "UPI", "CARD", "NETBANKING", etc.
+  paymentDetails  String?   @db.Text // JSON string with payment details
+  status          String    @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
+  transactionId   String?   // External payment gateway transaction ID
+  rejectionReason String?
+  approvedBy      String?   // Admin user ID who approved
+  approvedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// User Login History
+model LoginHistory {
+  id          String    @id @default(uuid())
+  userId      String    // Removed @db.Uuid to match existing database
+  user        User      @relation(fields: [userId], references: [id])
+  ipAddress   String?
+  userAgent   String?
+  deviceInfo  String?
+  location    String?
+  status      String    // "SUCCESS", "FAILED"
+  timestamp   DateTime  @default(now())
+}
+
+// Risk Management Report
+model RiskReport {
+  id              String    @id @default(uuid())
+  reportDate      DateTime  @default(now())
+  totalUsers      Int
+  activeUsers     Int
+  totalExposure   Float
+  equityExposure  Float
+  fnoExposure     Float
+  marginUtilized  Float
+  riskRatio       Float
+  details         String?   @db.Text // JSON string with detailed breakdown
+  createdBy       String    // Admin user ID who generated the report
+  createdAt       DateTime  @default(now())
+}
+
+model ApiUsage {
+  id          String   @id @default(uuid())
+  endpoint    String
+  method      String   // "GET", "POST", "PUT", "DELETE"
+  userId      String?  // Removed @db.Uuid to match existing database
+  statusCode  Int
+  responseTime Int      // in milliseconds
+  timestamp   DateTime @default(now())
+}
+
+model MarketHours {
+  id          String   @id @default(uuid())
+  exchange    String   @unique // "NSE", "BSE"
+  openTime    String   // "09:15"
+  closeTime   String   // "15:30"
+  timezone    String   @default("Asia/Kolkata")
+  isActive    Boolean  @default(true)
+  holidays    MarketHoliday[]
+}
+
+model MarketHoliday {
+  id          String   @id @default(uuid())
+  marketId    String
+  market      MarketHours @relation(fields: [marketId], references: [id])
+  date        DateTime
+  name        String
+  description String?
+}
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+model UserActivity {
+  id          String   @id @default(uuid())
+  userId      String   // Removed @db.Uuid to match existing database
+  action      String   // "LOGIN", "LOGOUT", "TRADE", "WATCHLIST_UPDATE", etc.
+  details     String?  @db.Text
+  ipAddress   String?
+  userAgent   String?
+  timestamp   DateTime @default(now())
+}
+
+model NotificationTemplate {
+  id          String   @id @default(uuid())
+  type        String   @unique // "PRICE_ALERT", "ORDER_EXECUTED", "MARGIN_CALL", etc.
+  subject     String
+  body        String   @db.Text
+  variables   String?  // JSON string of available variables
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model UserNotification {
+  id          String   @id @default(uuid())
+  userId      String   // Removed @db.Uuid to match existing database
+  title       String
+  message     String
+  type        String   // "PRICE_ALERT", "ORDER_EXECUTED", "SYSTEM", etc.
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
