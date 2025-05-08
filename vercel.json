@@ -5,7 +5,7 @@
       "src": "package.json",
       "use": "@vercel/next",
       "config": {
-        "buildCommand": "prisma generate --schema=prisma/schema.prisma --no-engine && next build"
+        "buildCommand": "node scripts/generate-client-only.js && next build"
       }
     }
   ],

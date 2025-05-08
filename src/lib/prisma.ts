@@ -23,15 +23,6 @@ const prismaClientSingleton = () => {
           // Try to use DIRECT_URL first if available to bypass connection pooling
           url: process.env.DIRECT_URL || process.env.DATABASE_URL,
         },
-      },
-      // Configure connection pool settings with conservative values
-      connectionLimit: {
-        default: {
-          connectionTimeout: 60000, // 60 seconds timeout
-          maxConnectionPoolSize: 3, // Reduced to avoid overwhelming the database
-          maxWaitingClients: 10, // Reduced to avoid too many waiting clients
-          idleTimeout: 300000, // 5 minutes idle timeout
-        }
       }
     })
   } catch (error) {

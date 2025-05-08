@@ -22,20 +22,6 @@ const createFallbackClient = () => {
         db: {
           url: process.env.DIRECT_URL || process.env.DATABASE_URL,
         },
-      },
-      
-      // Use conservative connection settings
-      connectionLimit: {
-        default: {
-          // Use longer timeouts
-          connectionTimeout: 60000, // 60 seconds
-          // Use fewer connections
-          maxConnectionPoolSize: 3,
-          // Allow fewer waiting clients
-          maxWaitingClients: 10,
-          // Use longer idle timeout
-          idleTimeout: 300000, // 5 minutes
-        }
       }
     });
   } catch (error) {
