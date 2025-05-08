@@ -20,21 +20,33 @@ export async function executeWithRetry<T>(
     } catch (error: any) {
       lastError = error;
       
-      // Check if this is a connection error that we should retry
-      const isConnectionError = 
+      // Enhanced error detection for various database connection issues
+      const isRetryableError = 
         error.code === 'P2024' || // Connection pool timeout
-        error.message?.includes('Unable to check out process from the pool') ||
-        error.message?.includes('connection pool');
+        error.code === 'P2028' || // Transaction API error
+        error.code === 'P2025' || // Record not found (might be due to replication lag)
+        error.message?.includes('timeout') ||
+        error.message?.includes('timed out') ||
+        error.message?.includes('connection') ||
+        error.message?.includes('pool') ||
+        error.message?.includes('ECONNREFUSED') ||
+        error.message?.includes('ETIMEDOUT') ||
+        error.message?.includes('statement timeout') ||
+        error.message?.includes('canceling statement');
       
-      if (!isConnectionError || attempt === maxRetries) {
-        // If it's not a connection error or we've reached max retries, throw the error
+      if (!isRetryableError || attempt === maxRetries) {
+        // If it's not a retryable error or we've reached max retries, throw the error
         throw error;
       }
       
-      console.warn(`Database operation failed (attempt ${attempt}/${maxRetries}): ${error.message}. Retrying in ${retryDelay}ms...`);
+      // Exponential backoff with jitter
+      const jitter = Math.random() * 500; // Add up to 500ms of random jitter
+      const delay = (retryDelay * Math.pow(2, attempt - 1)) + jitter;
+      
+      console.warn(`Database operation failed (attempt ${attempt}/${maxRetries}): ${error.message}. Retrying in ${delay}ms...`);
       
       // Wait before retrying
-      await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
   
@@ -60,11 +72,23 @@ export async function executeTransaction<T>(
  */
 export async function checkDatabaseConnection(): Promise<boolean> {
   try {
-    // Simple query to check if the database is responsive
-    await prisma.$queryRaw`SELECT 1`;
+    // Simple query to check if the database is responsive with a timeout
+    const result = await Promise.race([
+      prisma.$queryRaw`SELECT 1`,
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database connection timeout')), 5000)
+      )
+    ]);
     return true;
   } catch (error) {
     console.error('Database connection check failed:', error);
     return false;
+  } finally {
+    try {
+      // Explicitly disconnect to release the connection back to the pool
+      await prisma.$disconnect();
+    } catch (error) {
+      console.warn('Error disconnecting from database:', error);
+    }
   }
 }

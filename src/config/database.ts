@@ -7,29 +7,32 @@ export const databaseConfig = {
   // Connection pool settings
   connectionPool: {
     // Maximum number of connections in the pool
-    // Default is 5, but we're increasing it to handle more concurrent requests
-    maxConnections: 10,
+    // Keep at default 5 to avoid overwhelming the database
+    maxConnections: 5,
     
     // Connection timeout in milliseconds
-    // Default is 10000 (10 seconds), but we're increasing it to 30 seconds
-    connectionTimeout: 30000,
+    // Increased to 60 seconds to handle slow connections
+    connectionTimeout: 60000,
     
     // Maximum number of clients that can be waiting for a connection
-    maxWaitingClients: 50,
+    // Reduced to avoid too many waiting clients
+    maxWaitingClients: 20,
     
     // Idle timeout in milliseconds
     // How long a connection can remain idle before being closed
-    idleTimeout: 60000,
+    // Increased to 2 minutes to reduce connection churn
+    idleTimeout: 120000,
   },
   
   // Retry settings for database operations
   retry: {
     // Maximum number of retry attempts for database operations
-    maxRetries: 3,
+    // Increased to 5 for more resilience
+    maxRetries: 5,
     
     // Base delay between retry attempts in milliseconds
-    // This will be multiplied by the attempt number for exponential backoff
-    retryDelay: 1000,
+    // This will be multiplied by 2^attempt for exponential backoff
+    retryDelay: 500,
   },
   
   // Logging settings
@@ -52,8 +55,12 @@ export const databaseConfig = {
     // Whether to enable periodic health checks
     enabled: true,
     
-    // Interval between health checks in milliseconds (5 minutes)
-    interval: 300000,
+    // Interval between health checks in milliseconds (10 minutes)
+    // Increased to reduce database load from health checks
+    interval: 600000,
+    
+    // Timeout for health check queries in milliseconds
+    timeout: 5000,
   }
 };
 

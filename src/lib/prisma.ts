@@ -21,13 +21,13 @@ const prismaClientSingleton = () => {
         url: process.env.DATABASE_URL,
       },
     },
-    // Configure connection pool settings from centralized config
+    // Configure connection pool settings with higher timeouts
     connectionLimit: {
       default: {
-        connectionTimeout: databaseConfig.connectionPool.connectionTimeout,
-        maxConnectionPoolSize: databaseConfig.connectionPool.maxConnections,
-        maxWaitingClients: databaseConfig.connectionPool.maxWaitingClients,
-        idleTimeout: databaseConfig.connectionPool.idleTimeout,
+        connectionTimeout: 60000, // 60 seconds timeout
+        maxConnectionPoolSize: 5, // Keep default to avoid overwhelming the database
+        maxWaitingClients: 20,
+        idleTimeout: 120000, // 2 minutes idle timeout
       }
     }
   })
