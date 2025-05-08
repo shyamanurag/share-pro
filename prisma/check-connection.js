@@ -1,41 +1,63 @@
-// This script checks the database connection before deployment
-// It's useful to verify that the database is accessible
+/**
+ * Database Connection Check Script
+ * 
+ * This script verifies that the Prisma client can connect to the database
+ * using the current configuration.
+ */
 
 const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+require('dotenv').config();
 
-async function main() {
+async function checkConnection() {
+  console.log('Checking database connection...');
+  
+  const prisma = new PrismaClient();
+  
   try {
-    console.log('Checking database connection...');
-    
-    // Try a simple query to check connection
+    // Try to execute a simple query
     const result = await prisma.$queryRaw`SELECT 1 as check`;
     
     if (result && result[0] && result[0].check === 1) {
       console.log('✅ Database connection successful!');
-      return true;
+      
+      // Get database information
+      const dbInfo = await prisma.$queryRaw`SELECT current_database() as database, current_schema() as schema`;
+      console.log(`Connected to database: ${dbInfo[0].database}`);
+      console.log(`Using schema: ${dbInfo[0].schema}`);
+      
+      // Check if tables exist
+      const tables = await prisma.$queryRaw`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public'
+        ORDER BY table_name
+      `;
+      
+      if (tables.length > 0) {
+        console.log(`\nFound ${tables.length} tables in the database:`);
+        tables.forEach(table => {
+          console.log(`- ${table.table_name}`);
+        });
+      } else {
+        console.log('\nNo tables found in the database.');
+      }
     } else {
-      console.error('❌ Database connection check failed: Unexpected response');
-      return false;
+      console.error('❌ Database connection check failed: Unexpected result');
+      process.exit(1);
     }
   } catch (error) {
-    console.error('❌ Database connection check failed:', error);
-    return false;
+    console.error('❌ Database connection failed:', error.message);
+    process.exit(1);
   } finally {
     await prisma.$disconnect();
   }
 }
 
-// Run the check and exit with appropriate code
-main()
-  .then(success => {
-    if (success) {
-      process.exit(0); // Success
-    } else {
-      process.exit(1); // Failure
-    }
+checkConnection()
+  .then(() => {
+    process.exit(0);
   })
-  .catch(error => {
-    console.error('Error in connection check script:', error);
-    process.exit(1); // Failure
+  .catch((error) => {
+    console.error('Unhandled error:', error);
+    process.exit(1);
   });

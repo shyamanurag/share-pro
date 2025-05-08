@@ -17,12 +17,8 @@ const createFallbackClient = () => {
       // Use minimal logging to avoid overwhelming logs
       log: ['error'],
       
-      // Use the direct connection URL to bypass connection pooling issues
-      datasources: {
-        db: {
-          url: process.env.DIRECT_URL || process.env.DATABASE_URL,
-        },
-      }
+      // Use standard connection without custom datasource configuration
+      // This ensures compatibility with the database URL format
     });
   } catch (error) {
     console.error('Failed to create fallback Prisma client:', error);

@@ -18,12 +18,8 @@ const prismaClientSingleton = () => {
 
     return new PrismaClient({
       log: logLevels,
-      datasources: {
-        db: {
-          // Try to use DIRECT_URL first if available to bypass connection pooling
-          url: process.env.DIRECT_URL || process.env.DATABASE_URL,
-        },
-      }
+      // Use standard connection without additional datasource configuration
+      // This ensures compatibility with the database URL format
     })
   } catch (error) {
     console.error('Failed to initialize Prisma client with standard configuration:', error);

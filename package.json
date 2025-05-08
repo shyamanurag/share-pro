@@ -10,11 +10,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "vercel-build": "node scripts/generate-client-only.js && next build",
+    "vercel-build": "npx prisma generate && next build",
     "generate-icons": "node scripts/generate-pwa-icons.js",
-    "prisma:generate": "prisma generate --schema=prisma/schema.prisma --no-engine",
-    "prisma:check": "node prisma/direct-check.js",
-    "db:reset": "prisma migrate reset --force"
+    "prisma:generate": "prisma generate",
+    "prisma:check": "node prisma/check-connection.js",
+    "db:reset": "node scripts/reset-database.js",
+    "db:force-reset": "prisma migrate reset --force",
+    "db:check": "node prisma/check-connection.js",
+    "db:seed": "node prisma/seed.js"
   },
   "dependencies": {
     "@emotion/react": "^11.13.3",
