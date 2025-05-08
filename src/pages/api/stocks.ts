@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { createClient } from '@/util/supabase/api';
+import { executeWithRetry } from '@/lib/db-connection';
 
 // This API returns Indian NSE stock data
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -13,8 +14,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Get stocks from database or seed with Indian NSE stocks if none exist
-    let stocks = await prisma.stock.findMany({
-      orderBy: { symbol: 'asc' }
+    let stocks = await executeWithRetry(async () => {
+      return prisma.stock.findMany({
+        orderBy: { symbol: 'asc' }
+      });
     });
 
     // If no stocks in database, seed with Indian NSE stocks
@@ -43,34 +46,69 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         { symbol: "ULTRACEMCO", name: "UltraTech Cement Ltd.", currentPrice: 9850.45, previousClose: 9780.30, change: 70.15, changePercent: 0.72, volume: 345678, marketCap: 2840000000000, sector: "Cement" },
       ];
 
-      // Insert Indian stocks into database
-      await prisma.stock.createMany({
-        data: indianStocks.map(stock => ({
-          symbol: stock.symbol,
-          name: stock.name,
-          currentPrice: stock.currentPrice,
-          previousClose: stock.previousClose,
-          change: stock.change,
-          changePercent: stock.changePercent,
-          volume: stock.volume,
-          marketCap: stock.marketCap,
-          sector: stock.sector,
-          exchange: "NSE",
-          isF_O_Available: ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "SBIN", "TATAMOTORS", "ADANIENT"].includes(stock.symbol),
-          lotSize: stock.currentPrice > 1000 ? 25 : 50
-        })),
-        skipDuplicates: true,
+      // Insert Indian stocks into database with retry logic
+      await executeWithRetry(async () => {
+        return prisma.stock.createMany({
+          data: indianStocks.map(stock => ({
+            symbol: stock.symbol,
+            name: stock.name,
+            currentPrice: stock.currentPrice,
+            previousClose: stock.previousClose,
+            change: stock.change,
+            changePercent: stock.changePercent,
+            volume: stock.volume,
+            marketCap: stock.marketCap,
+            sector: stock.sector,
+            exchange: "NSE",
+            isF_O_Available: ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "SBIN", "TATAMOTORS", "ADANIENT"].includes(stock.symbol),
+            lotSize: stock.currentPrice > 1000 ? 25 : 50
+          })),
+          skipDuplicates: true,
+        });
       });
 
       // Fetch the stocks again with their IDs
-      stocks = await prisma.stock.findMany({
-        orderBy: { symbol: 'asc' }
+      stocks = await executeWithRetry(async () => {
+        return prisma.stock.findMany({
+          orderBy: { symbol: 'asc' }
+        });
       });
     }
 
+    // Log successful API call
+    try {
+      await prisma.systemLog.create({
+        data: {
+          level: 'INFO',
+          source: 'API_STOCKS',
+          message: `Successfully fetched ${stocks.length} stocks`,
+        }
+      });
+    } catch (error) {
+      console.warn('Failed to log API call:', error);
+    }
+
     return res.status(200).json({ stocks });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching stocks:', error);
-    return res.status(500).json({ error: 'Failed to fetch stocks' });
+    
+    // Log the error
+    try {
+      await prisma.systemLog.create({
+        data: {
+          level: 'ERROR',
+          source: 'API_STOCKS',
+          message: 'Failed to fetch stocks',
+          details: error.message || 'Unknown error',
+        }
+      });
+    } catch (logError) {
+      console.error('Failed to log error:', logError);
+    }
+    
+    return res.status(500).json({ 
+      error: 'Failed to fetch stocks',
+      message: error.message || 'Unknown error'
+    });
   }
 }

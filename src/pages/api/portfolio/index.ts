@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { withAuth, logApiUsage } from '@/lib/api-auth';
 import { calculatePortfolioValue } from '@/lib/accounting';
+import { executeWithRetry } from '@/lib/db-connection';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Record start time for performance monitoring
@@ -36,30 +37,38 @@ const authenticatedHandler = withAuth(async (req: NextApiRequest, res: NextApiRe
     // GET: Fetch user's portfolio with stock details
     if (req.method === 'GET') {
       try {
-        // Find or create default portfolio for user
-        let portfolio = await prisma.portfolio.findFirst({
-          where: { userId },
+        // Find or create default portfolio for user with retry logic
+        let portfolio = await executeWithRetry(async () => {
+          return prisma.portfolio.findFirst({
+            where: { userId },
+          });
         });
 
         if (!portfolio) {
-          portfolio = await prisma.portfolio.create({
-            data: {
-              name: 'My Portfolio',
-              userId,
-            },
+          portfolio = await executeWithRetry(async () => {
+            return prisma.portfolio.create({
+              data: {
+                name: 'My Portfolio',
+                userId,
+              },
+            });
           });
         }
 
-        // Get portfolio items with stock details
-        const portfolioItems = await prisma.portfolioItem.findMany({
-          where: { portfolioId: portfolio.id },
-          include: { stock: true },
+        // Get portfolio items with stock details with retry logic
+        const portfolioItems = await executeWithRetry(async () => {
+          return prisma.portfolioItem.findMany({
+            where: { portfolioId: portfolio.id },
+            include: { stock: true },
+          });
         });
 
-        // Get user's balance
-        const userData = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { balance: true },
+        // Get user's balance with retry logic
+        const userData = await executeWithRetry(async () => {
+          return prisma.user.findUnique({
+            where: { id: userId },
+            select: { balance: true },
+          });
         });
 
         // Calculate portfolio value using accounting utility

@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { withAuth, logApiUsage } from '@/lib/api-auth';
 import { validation } from '@/lib/validation';
+import { executeWithRetry, executeTransaction } from '@/lib/db-connection';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Record start time for performance monitoring
@@ -51,12 +52,14 @@ const authenticatedHandler = withAuth(async (req: NextApiRequest, res: NextApiRe
           return;
         }
         
-        // Get specific watchlist
-        watchlist = await prisma.watchlist.findFirst({
-          where: { 
-            id: watchlistId,
-            userId // Ensure user can only access their own watchlists
-          },
+        // Get specific watchlist with retry logic
+        watchlist = await executeWithRetry(async () => {
+          return prisma.watchlist.findFirst({
+            where: { 
+              id: watchlistId,
+              userId // Ensure user can only access their own watchlists
+            },
+          });
         });
         
         if (!watchlist) {
@@ -68,32 +71,40 @@ const authenticatedHandler = withAuth(async (req: NextApiRequest, res: NextApiRe
           return;
         }
       } else {
-        // Get or create default watchlist
-        watchlist = await prisma.watchlist.findFirst({
-          where: { userId },
-          orderBy: { updatedAt: 'desc' },
+        // Get or create default watchlist with retry logic
+        watchlist = await executeWithRetry(async () => {
+          return prisma.watchlist.findFirst({
+            where: { userId },
+            orderBy: { updatedAt: 'desc' },
+          });
         });
 
         if (!watchlist) {
-          watchlist = await prisma.watchlist.create({
-            data: {
-              name: 'My Watchlist',
-              userId,
-            },
+          watchlist = await executeWithRetry(async () => {
+            return prisma.watchlist.create({
+              data: {
+                name: 'My Watchlist',
+                userId,
+              },
+            });
           });
         }
       }
 
-      // Get watchlist items with stock details
-      const watchlistItems = await prisma.watchlistItem.findMany({
-        where: { watchlistId: watchlist.id },
-        include: { stock: true },
+      // Get watchlist items with stock details using retry logic
+      const watchlistItems = await executeWithRetry(async () => {
+        return prisma.watchlistItem.findMany({
+          where: { watchlistId: watchlist.id },
+          include: { stock: true },
+        });
       });
 
-      // Get all user's watchlists for the dropdown
-      const allWatchlists = await prisma.watchlist.findMany({
-        where: { userId },
-        orderBy: { updatedAt: 'desc' },
+      // Get all user's watchlists for the dropdown with retry logic
+      const allWatchlists = await executeWithRetry(async () => {
+        return prisma.watchlist.findMany({
+          where: { userId },
+          orderBy: { updatedAt: 'desc' },
+        });
       });
 
       // Log successful API usage
@@ -139,10 +150,12 @@ const authenticatedHandler = withAuth(async (req: NextApiRequest, res: NextApiRe
         return;
       }
       
-      // Validate that the stock exists
-      const stockExists = await prisma.stock.findUnique({
-        where: { id: stockId },
-        select: { id: true }
+      // Validate that the stock exists with retry logic
+      const stockExists = await executeWithRetry(async () => {
+        return prisma.stock.findUnique({
+          where: { id: stockId },
+          select: { id: true }
+        });
       });
       
       if (!stockExists) {
@@ -154,15 +167,17 @@ const authenticatedHandler = withAuth(async (req: NextApiRequest, res: NextApiRe
         return;
       }
 
-      // Find specified watchlist or default watchlist
+      // Find specified watchlist or default watchlist with retry logic
       let watchlist;
       
       if (watchlistId) {
-        watchlist = await prisma.watchlist.findFirst({
-          where: { 
-            id: watchlistId,
-            userId // Ensure user can only access their own watchlists
-          },
+        watchlist = await executeWithRetry(async () => {
+          return prisma.watchlist.findFirst({
+            where: { 
+              id: watchlistId,
+              userId // Ensure user can only access their own watchlists
+            },
+          });
         });
         
         if (!watchlist) {
@@ -174,28 +189,34 @@ const authenticatedHandler = withAuth(async (req: NextApiRequest, res: NextApiRe
           return;
         }
       } else {
-        // Find or create default watchlist
-        watchlist = await prisma.watchlist.findFirst({
-          where: { userId },
-          orderBy: { updatedAt: 'desc' },
+        // Find or create default watchlist with retry logic
+        watchlist = await executeWithRetry(async () => {
+          return prisma.watchlist.findFirst({
+            where: { userId },
+            orderBy: { updatedAt: 'desc' },
+          });
         });
 
         if (!watchlist) {
-          watchlist = await prisma.watchlist.create({
-            data: {
-              name: 'My Watchlist',
-              userId,
-            },
+          watchlist = await executeWithRetry(async () => {
+            return prisma.watchlist.create({
+              data: {
+                name: 'My Watchlist',
+                userId,
+              },
+            });
           });
         }
       }
 
-      // Check if stock already in watchlist
-      const existingItem = await prisma.watchlistItem.findFirst({
-        where: {
-          watchlistId: watchlist.id,
-          stockId: stockId,
-        },
+      // Check if stock already in watchlist with retry logic
+      const existingItem = await executeWithRetry(async () => {
+        return prisma.watchlistItem.findFirst({
+          where: {
+            watchlistId: watchlist.id,
+            stockId: stockId,
+          },
+        });
       });
 
       if (existingItem) {
@@ -207,19 +228,24 @@ const authenticatedHandler = withAuth(async (req: NextApiRequest, res: NextApiRe
         return;
       }
 
-      // Add stock to watchlist
-      const watchlistItem = await prisma.watchlistItem.create({
-        data: {
-          watchlistId: watchlist.id,
-          stockId: stockId,
-        },
-        include: { stock: true },
-      });
+      // Use a transaction to add stock to watchlist and update timestamp
+      const watchlistItem = await executeTransaction(async (tx) => {
+        // Add stock to watchlist
+        const item = await tx.watchlistItem.create({
+          data: {
+            watchlistId: watchlist.id,
+            stockId: stockId,
+          },
+          include: { stock: true },
+        });
 
-      // Update the watchlist's updatedAt timestamp
-      await prisma.watchlist.update({
-        where: { id: watchlist.id },
-        data: { updatedAt: new Date() },
+        // Update the watchlist's updatedAt timestamp
+        await tx.watchlist.update({
+          where: { id: watchlist.id },
+          data: { updatedAt: new Date() },
+        });
+        
+        return item;
       });
 
       // Log successful API usage
