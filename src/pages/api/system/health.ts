@@ -1,82 +1,107 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { checkDatabaseConnection } from '@/lib/db-connection';
+import nc from 'next-connect';
+import { dbConnectionMiddleware, requireHealthyDbConnection } from '@/middleware/db-connection-middleware';
+import prismaErrorHandler from '@/middleware/prisma-error-handler';
+import dbHealthMonitor from '@/lib/db-health-monitor';
 import prisma from '@/lib/prisma';
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+// Create a handler with middleware
+const handler = nc({
+  onError: (err, req, res: NextApiResponse) => {
+    console.error('Health API error:', err);
+    res.status(500).json({
+      status: 'error',
+      message: err.message || 'An unexpected error occurred',
+      timestamp: new Date().toISOString()
+    });
+  },
+  onNoMatch: (req, res: NextApiResponse) => {
+    res.status(405).json({
+      status: 'error',
+      message: `Method ${req.method} not allowed`,
+      timestamp: new Date().toISOString()
+    });
   }
+})
+  .use(dbConnectionMiddleware())
+  .use(prismaErrorHandler())
+  .use(requireHealthyDbConnection());
 
-  const healthStatus = {
-    status: 'ok',
+// GET handler for health check
+handler.get(async (req: NextApiRequest, res: NextApiResponse) => {
+  // Check overall system health
+  const dbHealthy = dbHealthMonitor.isDatabaseHealthy();
+  
+  // Get system settings
+  const systemSettings = await prisma.systemSetting.findMany({
+    where: {
+      key: {
+        in: ['MAINTENANCE_MODE', 'TRADING_HOURS_START', 'TRADING_HOURS_END']
+      }
+    }
+  });
+  
+  // Convert settings to a map
+  const settings = systemSettings.reduce((acc, setting) => {
+    acc[setting.key] = setting.value;
+    return acc;
+  }, {} as Record<string, string>);
+  
+  // Check if system is in maintenance mode
+  const maintenanceMode = settings['MAINTENANCE_MODE'] === 'true';
+  
+  // Check if we're in trading hours
+  const now = new Date();
+  const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  const tradingHoursStart = settings['TRADING_HOURS_START'] || '09:15';
+  const tradingHoursEnd = settings['TRADING_HOURS_END'] || '15:30';
+  const inTradingHours = currentTime >= tradingHoursStart && currentTime <= tradingHoursEnd;
+  
+  // Get memory usage
+  const memoryUsage = process.memoryUsage();
+  
+  // Determine overall system status
+  let status = 'ok';
+  if (!dbHealthy) {
+    status = 'error';
+  } else if (maintenanceMode) {
+    status = 'maintenance';
+  }
+  
+  // Return health status
+  return res.status(200).json({
+    status,
     timestamp: new Date().toISOString(),
-    services: {
+    components: {
       database: {
-        status: 'unknown',
-        message: ''
+        status: dbHealthy ? 'ok' : 'error',
+        message: dbHealthy ? 'Database connection successful' : 'Database connection failed'
       },
       api: {
         status: 'ok',
-        uptime: process.uptime()
+        message: 'API is responding'
       }
     },
-    environment: process.env.NODE_ENV || 'development'
-  };
-
-  try {
-    // Check database connection
-    const isDbConnected = await checkDatabaseConnection();
-    
-    if (isDbConnected) {
-      healthStatus.services.database.status = 'ok';
-      healthStatus.services.database.message = 'Database connection successful';
-      
-      // Try to get some basic stats
-      try {
-        const userCount = await prisma.user.count();
-        const stockCount = await prisma.stock.count();
-        
-        healthStatus.services.database = {
-          ...healthStatus.services.database,
-          stats: {
-            users: userCount,
-            stocks: stockCount
-          }
-        };
-      } catch (error) {
-        console.warn('Failed to get database stats:', error);
+    settings: {
+      maintenanceMode,
+      tradingHours: {
+        start: tradingHoursStart,
+        end: tradingHoursEnd,
+        current: currentTime,
+        inTradingHours
       }
-    } else {
-      healthStatus.status = 'degraded';
-      healthStatus.services.database.status = 'error';
-      healthStatus.services.database.message = 'Database connection failed';
+    },
+    system: {
+      memory: {
+        rss: `${Math.round(memoryUsage.rss / 1024 / 1024)} MB`,
+        heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB`,
+        heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`,
+        external: `${Math.round(memoryUsage.external / 1024 / 1024)} MB`
+      },
+      uptime: `${Math.round(process.uptime())} seconds`,
+      nodeVersion: process.version
     }
+  });
+});
 
-    // Log the health check
-    try {
-      await prisma.systemLog.create({
-        data: {
-          level: 'INFO',
-          source: 'SYSTEM_HEALTH',
-          message: `System health check: ${healthStatus.status}`,
-          details: JSON.stringify(healthStatus)
-        }
-      });
-    } catch (error) {
-      console.warn('Failed to log health check:', error);
-    }
-
-    return res.status(200).json(healthStatus);
-  } catch (error: any) {
-    healthStatus.status = 'error';
-    healthStatus.services.database.status = 'error';
-    healthStatus.services.database.message = error.message || 'Unknown database error';
-    
-    console.error('Health check error:', error);
-    
-    return res.status(500).json(healthStatus);
-  }
-}
+export default handler;
