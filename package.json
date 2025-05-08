@@ -10,8 +10,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "vercel-build": "prisma db push --accept-data-loss && next build",
-    "generate-icons": "node scripts/generate-pwa-icons.js"
+    "vercel-build": "node prisma/check-connection.js && prisma generate && next build",
+    "generate-icons": "node scripts/generate-pwa-icons.js",
+    "prisma:generate": "prisma generate",
+    "prisma:skip-migration": "node prisma/skip-migration.js",
+    "prisma:introspect": "node prisma/introspect-schema.js",
+    "prisma:check": "node prisma/check-connection.js"
   },
   "dependencies": {
     "@emotion/react": "^11.13.3",
