@@ -10,12 +10,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "vercel-build": "node scripts/build-without-migrations.js",
+    "vercel-build": "prisma generate --schema=prisma/schema.empty.prisma && next build",
     "generate-icons": "node scripts/generate-pwa-icons.js",
     "prisma:generate": "prisma generate",
-    "prisma:minimal": "node prisma/generate-minimal.js",
-    "prisma:check": "node prisma/direct-check.js",
-    "build:no-migrations": "node scripts/build-without-migrations.js"
+    "prisma:check": "node prisma/direct-check.js"
   },
   "dependencies": {
     "@emotion/react": "^11.13.3",

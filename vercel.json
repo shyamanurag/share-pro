@@ -1,3 +1,15 @@
 {
-  "installCommand": "pnpm install --no-frozen-lockfile"
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next",
+      "config": {
+        "buildCommand": "prisma generate --schema=prisma/schema.empty.prisma && next build"
+      }
+    }
+  ],
+  "env": {
+    "PRISMA_SKIP_MIGRATIONS": "true"
+  }
 }
