@@ -40,10 +40,14 @@ let prisma: ReturnType<typeof prismaClientSingleton>;
 try {
   prisma = globalThis.prismaGlobal ?? prismaClientSingleton();
   
-  // Add connection management and logging
-  prisma.$on('beforeExit', async () => {
-    console.log('Disconnecting Prisma Client...')
-  })
+  // Note: 'beforeExit' hook is not applicable to the library engine since Prisma 5.0.0
+  // Instead, we'll handle disconnection through process events
+  if (process.env.NODE_ENV !== 'production') {
+    process.on('beforeExit', async () => {
+      console.log('Disconnecting Prisma Client...')
+      await prisma.$disconnect()
+    })
+  }
 
   // Log slow queries if enabled
   if (databaseConfig.logging.logSlowQueries) {

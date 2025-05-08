@@ -13,13 +13,16 @@ const createFallbackClient = () => {
   console.warn('Using fallback Prisma client configuration');
   
   try {
-    return new PrismaClient({
+    const client = new PrismaClient({
       // Use minimal logging to avoid overwhelming logs
       log: ['error'],
       
       // Use standard connection without custom datasource configuration
       // This ensures compatibility with the database URL format
     });
+    
+    // No event handlers that could cause issues
+    return client;
   } catch (error) {
     console.error('Failed to create fallback Prisma client:', error);
     throw error;
