@@ -42,6 +42,9 @@ interface QuickTradeButtonProps {
   className?: string;
   defaultTradeType?: 'BUY' | 'SELL';
   showQuickOptions?: boolean;
+  futuresContract?: FuturesContract;
+  optionsContract?: OptionsContract;
+  assetType?: 'STOCK' | 'FUTURES' | 'OPTIONS';
 }
 
 /**
@@ -56,10 +59,13 @@ export default function QuickTradeButton({
   showIcon = true,
   className = '',
   defaultTradeType = 'BUY',
-  showQuickOptions = true
+  showQuickOptions = true,
+  futuresContract,
+  optionsContract,
+  assetType = 'STOCK'
 }: QuickTradeButtonProps) {
-  const { handleStockClick } = useStockClickHandler();
-  const { openQuickTradeModal, openShareModal, executeUniversalTrade } = useTrade();
+  const { handleStockClick, handleFuturesClick, handleOptionsClick } = useStockClickHandler();
+  const { openQuickTradeModal, openFuturesTradeModal, openOptionsTradeModal, openShareModal, executeUniversalTrade } = useTrade();
   
   // Quick trade dialog state
   const [isQuickTradeOpen, setIsQuickTradeOpen] = useState(false);
@@ -70,7 +76,14 @@ export default function QuickTradeButton({
   // Handle button click
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    openQuickTradeModal(stock, defaultTradeType);
+    
+    if (assetType === 'FUTURES' && futuresContract) {
+      openFuturesTradeModal(stock, futuresContract, defaultTradeType);
+    } else if (assetType === 'OPTIONS' && optionsContract) {
+      openOptionsTradeModal(stock, optionsContract, defaultTradeType);
+    } else {
+      openQuickTradeModal(stock, defaultTradeType);
+    }
   };
   
   // Handle quick buy
@@ -151,6 +164,85 @@ export default function QuickTradeButton({
               <TrendingUp className="h-4 w-4 mr-2" />
               <span>Advanced Trade</span>
             </DropdownMenuItem>
+            
+            {/* F&O Trading Options */}
+            {assetType === 'STOCK' && (
+              <>
+                <DropdownMenuItem 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Fetch available futures contracts and open modal
+                    fetch(`/api/fno/futures?stockId=${stock.id}`)
+                      .then(res => res.json())
+                      .then(data => {
+                        if (data.contracts && data.contracts.length > 0) {
+                          openFuturesTradeModal(stock, data.contracts[0], defaultTradeType);
+                        } else {
+                          toast({
+                            title: "No Futures Available",
+                            description: "There are no futures contracts available for this stock.",
+                            variant: "destructive"
+                          });
+                        }
+                      })
+                      .catch(err => {
+                        console.error("Error fetching futures contracts:", err);
+                        toast({
+                          title: "Error",
+                          description: "Failed to fetch futures contracts.",
+                          variant: "destructive"
+                        });
+                      });
+                  }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 text-orange-500">
+                    <path d="M2 16V8a4 4 0 0 1 4-4h12a4 4 0 0 1 4 4v8a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4z"></path>
+                    <path d="m9 10 3-3 3 3"></path>
+                    <path d="M12 7v7"></path>
+                    <path d="m15 14 3 3-3 3"></path>
+                    <path d="M18 17h-7"></path>
+                  </svg>
+                  <span>Futures Trading</span>
+                </DropdownMenuItem>
+                
+                <DropdownMenuItem 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Fetch available options contracts and open modal
+                    fetch(`/api/fno/options?stockId=${stock.id}`)
+                      .then(res => res.json())
+                      .then(data => {
+                        if (data.contracts && data.contracts.length > 0) {
+                          openOptionsTradeModal(stock, data.contracts[0], defaultTradeType);
+                        } else {
+                          toast({
+                            title: "No Options Available",
+                            description: "There are no options contracts available for this stock.",
+                            variant: "destructive"
+                          });
+                        }
+                      })
+                      .catch(err => {
+                        console.error("Error fetching options contracts:", err);
+                        toast({
+                          title: "Error",
+                          description: "Failed to fetch options contracts.",
+                          variant: "destructive"
+                        });
+                      });
+                  }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 text-purple-500">
+                    <path d="M2 12h10"></path>
+                    <path d="M9 4v16"></path>
+                    <path d="M14 9h8"></path>
+                    <path d="M18 5v8"></path>
+                  </svg>
+                  <span>Options Trading</span>
+                </DropdownMenuItem>
+              </>
+            )}
+            
             <DropdownMenuItem onClick={handleShare}>
               <Share2 className="h-4 w-4 mr-2 text-blue-500" />
               <span>Share</span>

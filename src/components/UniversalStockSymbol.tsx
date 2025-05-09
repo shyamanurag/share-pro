@@ -16,6 +16,9 @@ interface UniversalStockSymbolProps {
   size?: 'sm' | 'md' | 'lg';
   variant?: 'default' | 'compact' | 'detailed';
   tradeType?: 'BUY' | 'SELL';
+  futuresContract?: FuturesContract;
+  optionsContract?: OptionsContract;
+  assetType?: 'STOCK' | 'FUTURES' | 'OPTIONS';
 }
 
 /**
@@ -32,9 +35,12 @@ export function UniversalStockSymbol({
   onClick,
   size = 'md',
   variant = 'default',
-  tradeType = 'BUY'
+  tradeType = 'BUY',
+  futuresContract,
+  optionsContract,
+  assetType = 'STOCK'
 }: UniversalStockSymbolProps) {
-  const { handleStockClick } = useStockClickHandler();
+  const { handleStockClick, handleFuturesClick, handleOptionsClick } = useStockClickHandler();
 
   // Size-based classes
   const sizeClasses = {
@@ -48,7 +54,13 @@ export function UniversalStockSymbol({
     if (onClick) {
       onClick(stock, e);
     } else {
-      handleStockClick(stock, tradeType, e);
+      if (assetType === 'FUTURES' && futuresContract) {
+        handleFuturesClick(stock, futuresContract, tradeType, e);
+      } else if (assetType === 'OPTIONS' && optionsContract) {
+        handleOptionsClick(stock, optionsContract, tradeType, e);
+      } else {
+        handleStockClick(stock, tradeType, e);
+      }
     }
   };
 
@@ -157,16 +169,62 @@ export function UniversalStockSymbol({
           <TooltipContent side="top">
             <div className="text-xs">
               <div className="font-medium">{stock.name}</div>
-              <div className="flex justify-between mt-1">
-                <span>Current Price:</span>
-                <span className="ml-2 font-medium">₹{stock.currentPrice.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Change:</span>
-                <span className={`ml-2 ${stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)} ({stock.changePercent.toFixed(2)}%)
-                </span>
-              </div>
+              
+              {assetType === 'STOCK' && (
+                <>
+                  <div className="flex justify-between mt-1">
+                    <span>Current Price:</span>
+                    <span className="ml-2 font-medium">₹{stock.currentPrice.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Change:</span>
+                    <span className={`ml-2 ${stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)} ({stock.changePercent.toFixed(2)}%)
+                    </span>
+                  </div>
+                </>
+              )}
+              
+              {assetType === 'FUTURES' && futuresContract && (
+                <>
+                  <div className="flex justify-between mt-1">
+                    <span>Contract Price:</span>
+                    <span className="ml-2 font-medium">₹{futuresContract.contractPrice.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Expiry:</span>
+                    <span className="ml-2">{new Date(futuresContract.expiryDate).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Lot Size:</span>
+                    <span className="ml-2">{futuresContract.lotSize}</span>
+                  </div>
+                </>
+              )}
+              
+              {assetType === 'OPTIONS' && optionsContract && (
+                <>
+                  <div className="flex justify-between mt-1">
+                    <span>Type:</span>
+                    <span className={`ml-2 font-medium ${optionsContract.type === 'CALL' ? 'text-green-500' : 'text-red-500'}`}>
+                      {optionsContract.type}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Strike Price:</span>
+                    <span className="ml-2 font-medium">₹{optionsContract.strikePrice.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Premium:</span>
+                    <span className="ml-2">₹{optionsContract.premiumPrice.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Expiry:</span>
+                    <span className="ml-2">{new Date(optionsContract.expiryDate).toLocaleDateString()}</span>
+                  </div>
+                </>
+              )}
+              
               <div className="text-center mt-1 text-muted-foreground">Click to trade</div>
             </div>
           </TooltipContent>
